@@ -127,7 +127,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 
 	unsigned int requestType = rq_data_dir(req);
 
-	if ((num_bytes + offset) > (nsectors * SECTOR_SIZE)
+	if ((num_bytes + offset) > (nsectors * SECTOR_SIZE))
 	{
 		// Too much data
 		end_request(req, 0);
@@ -182,7 +182,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 
 		if (filp_writable) // opened for writing
 		{
-			
+
 		}
 		else // opened for reading
 		{
