@@ -121,18 +121,30 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 
 	// Your code here.
 
+	unsigned long offset = req->sector * SECTOR_SIZE;
+	size_t num_bytes = req->current_nr_sectors * SECTOR_SIZE;
+	uint8_t *data_ptr = d->data + offset;
+
 	unsigned int requestType = rq_data_dir(req);
 
-	uint8_t *ptr = d->data_t(req->sector) * SECTOR_SIZE;
+	if ((num_bytes + offset) > (nsectors * SECTOR_SIZE)
+	{
+		// Too much data
+		end_request(req, 0);
+	}
 
 	if (requestType == READ)
 	{
- 		memcpy((void*)req->buffer, (void*)ptr, req->current_nr_sectors * SECTOR_SIZE);
+ 		memcpy((void*)req->buffer, (void*)data_ptr, num_bytes);
 	}
-
- 	if (requestType == WRITE)
+ 	else if (requestType == WRITE)
  	{
- 		memcpy((void*)ptr, (void*)req->buffer, req->current_nr_sectors * SECTOR_SIZE)
+ 		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
+ 	}
+ 	else
+ 	{
+ 		// Not a read or write request. We are done with this request.
+ 		end_request(req, 0);
  	}
 
 	eprintk("Should process request...\n");
@@ -159,6 +171,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 {
 	if (filp) {
 		osprd_info_t *d = file2osprd(filp);
+		// Indicates whether the file was opened for reading or writing
 		int filp_writable = filp->f_mode & FMODE_WRITE;
 
 		// EXERCISE: If the user closes a ramdisk file that holds
@@ -166,6 +179,15 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		// as appropriate.
 
 		// Your code here.
+
+		if (filp_writable) // opened for writing
+		{
+			
+		}
+		else // opened for reading
+		{
+
+		}
 
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
