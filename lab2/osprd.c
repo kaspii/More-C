@@ -188,28 +188,45 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 
 		// Your code here.
 
-		if (filp_writable) // opened for writing
+		//************ IN PROGRESS ********************************************
+		//************ NEED TO PROTECT CRIT SECTIONS WITH SPINLOCKS ***********
+
+		// Check if the file is locked
+		if (filp->f_flags & F_OSPRD_LOCKED)
 		{
-			if (d->write_locked)
+			if (filp_writable) // opened for writing
 			{
-				d->write_locked = 0;
-				// Now, no process has the write lock
-				d->write_lock_pid = -1;
+				// Check if the file is write locked
+				if (d->write_locked)
+				{
+					d->write_locked = 0;
+					// Now, no process has the write lock
+					d->write_lock_pid = -1;
+				}
 			}
+			else // opened for reading
+			{
+				// Check if the file has read locks
+				if (d->num_read_locks > 0)
+				{
+					// Delete the entire list of readers
+					d->num_read_locks = 0;	
+				}
+			}
+
+			// release the lock
+			osp_spin_unlock(&d->mutex);
+
+			// wake up all blocked processes
+			wake_up_all(&d->blockq);
 		}
-		else // opened for reading
+		else
 		{
-			// Delete the entire list of readers
-
-
-			d->num_read_locks = 0;
+			// the file was not locked
+			return 0;
 		}
 
-		// unlock
-		osp_spin_unlock(&d->mutex);
-
-		// wake up all blocked processes
-		wake_up_all(&d->blockq);
+		//************ IN PROGRESS ********************************************
 
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
@@ -250,7 +267,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// to write-lock the ramdisk; otherwise attempt to read-lock
 		// the ramdisk.
 		//
-                // This lock request must block using 'd->blockq' until:
+        // This lock request must block using 'd->blockq' until:
 		// 1) no other process holds a write lock;
 		// 2) either the request is for a read lock, or no other process
 		//    holds a read lock; and
@@ -280,8 +297,52 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// be protected by a spinlock; which ones?)
 
 		// Your code here (instead of the next two lines).
-		eprintk("Attempting to acquire\n");
-		r = -ENOTTY;
+		// eprintk("Attempting to acquire\n");
+		// r = -ENOTTY;
+
+		//************ IN PROGRESS ********************************************
+		//************ NEED TO PROTECT CRIT SECTIONS WITH SPINLOCKS ***********
+
+		// Set a local variable to 'd->ticket_head' and increment 'd->ticket_head'
+		int local_ticket = d->ticket_head;
+		d->ticket_head++;
+
+		if (filp_writable) // opened for writing
+		{
+			int wait_signal = wait_event_interruptible(d->blockq, !d->write_locked && !d->num_read_locks && d->ticket_tail >= local_ticket);
+
+			// If the lock request blocks and is awoken by a signal, then
+			// return -ERESTARTSYS.
+			if (wait_signal == -ERESTARTSYS)
+			{
+				return -ERESTARTSYS;
+			}
+
+			// The file is now write locked by the current process
+			d->write_locked = 1;
+			d->write_lock_pid = current->pid;
+
+			// Updae the ticket list
+			d->ticket_tail++;
+
+			// Mark file as locked
+			filp->f_flags |= F_OSPRD_LOCKED;
+		}
+		else // opened for reading
+		{
+			wait_event_interruptible(d->blockq, !d->write_locked && d->ticket_tail >= local_ticket);
+
+			// This file now has another read lock
+			d->num_read_locks++;
+
+			// Update the ticket list
+			d->ticket_tail++;
+
+			// Mark file as locked
+			filp->f_flags |= F_OSPRD_LOCKED;
+		}
+
+		//************ IN PROGRESS ********************************************
 
 	} else if (cmd == OSPRDIOCTRYACQUIRE) {
 
