@@ -206,10 +206,10 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		}
 
 		// unlock
-		osp_spin_unlock(d->mutex);
+		osp_spin_unlock(&d->mutex);
 
 		// wake up all blocked processes
-		wake_up_all(d->blockq);
+		wake_up_all(&d->blockq);
 
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
