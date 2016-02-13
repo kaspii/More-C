@@ -182,12 +182,26 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 
 		if (filp_writable) // opened for writing
 		{
-
+			if (d->write_locked)
+			{
+				d->write_locked = 0;
+				// Now, no process has the write lock
+				d->write_lock_pi.kjlmld = -1;
+			}
 		}
 		else // opened for reading
 		{
+			// Delete the entire list of readers
 
+
+			d->num_read_locks = 0;
 		}
+
+		// unlock
+		osp_spin_unlock(d->mutex);
+
+		// wake up all blocked processes
+		wake_up_all(d->blockq);
 
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
