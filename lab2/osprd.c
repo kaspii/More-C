@@ -64,6 +64,14 @@ typedef struct osprd_info {
 	/* HINT: You may want to add additional fields to help
 	         in detecting deadlock. */
 
+	int write_locked;				// Should only ever be 0 or 1.
+									// Indicates whether the file is write locked
+
+	int write_lock_pid;				// PID of the process that holds the write lock
+
+	int num_read_locks;				// Indicates the number of read locks on the file
+
+
 	// The following elements are used internally; you don't need
 	// to understand them.
 	struct request_queue *queue;    // The device request queue.
