@@ -352,7 +352,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->write_locked = 1;
 			d->write_lock_pid = current->pid;
 
-			// Updae the ticket list
+			// Update the ticket list
 			d->ticket_tail++;
 
 			// Mark file as locked
@@ -441,7 +441,26 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// you need, and return 0.
 
 		// Your code here (instead of the next line).
-		r = -ENOTTY;
+		//r = -ENOTTY;
+
+		//************ IN PROGRESS ********************************************
+		//************ NEED TO PROTECT CRIT SECTIONS WITH SPINLOCKS ***********
+
+		// If the file hasn't locked the ramdisk, return -EINVAL.
+		if (!(filp->f_flags & F_OSPRD_LOCKED))
+		{
+			return -EINVAL;
+		}
+
+		// Clear the lock from filp->f_flags
+		filp->f_flags &= ~F_OSPRD_LOCKED;
+
+		// Wake up the wait queue
+		wake_up_all(&d->blockq);
+
+		r = 0
+
+		//************ IN PROGRESS ********************************************
 
 	} else
 		r = -ENOTTY; /* unknown command */
