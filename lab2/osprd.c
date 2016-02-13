@@ -51,12 +51,27 @@ typedef struct mList
 } mlist_t;
 
 /* Add the pid to the end of the list */
-addToList(pid_t pid, mlist_t l)
+void addToList(pid_t pid, mlist_t l)
 {
 	mlist_t *tmp;
 	tmp = (mlist_t *)malloc(sizeof(mlist_t));
 	&tmp->pid = pid;
 	list_add(&(tmp->list), &(l.list));
+}
+
+/* Delete the list and deallocate */
+void deleteList(mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+		printf("freeing pid %d\n", tmp->pid);
+		list_del(pos);
+		free(tmp);
+	}
 }
 
 /* The internal representation of our device. */
