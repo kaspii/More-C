@@ -244,9 +244,6 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 				}
 			}
 
-			// release the lock
-			osp_spin_unlock(&d->mutex);
-
 			// wake up all blocked processes
 			wake_up_all(&d->blockq);
 		}
@@ -398,7 +395,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			if (d->write_locked == 0 && d->num_read_locks == 0)
 			{
+				// The file is now write locked by the current process
 				d->write_locked = 1;
+				d->write_lock_pid = current->pid;
 
 				// Mark file as locked
 				filp->f_flags |= F_OSPRD_LOCKED;
@@ -415,6 +414,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			if (d->write_locked == 0)
 			{
+				// This file now has another read lock
 				d->num_read_locks++;
 
 				// Mark file as locked
@@ -449,16 +449,30 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// If the file hasn't locked the ramdisk, return -EINVAL.
 		if (!(filp->f_flags & F_OSPRD_LOCKED))
 		{
-			return -EINVAL;
+			r = -EINVAL;
 		}
+		else
+		{
+			// Clear the lock from filp->f_flags
+			filp->f_flags &= ~F_OSPRD_LOCKED;
 
-		// Clear the lock from filp->f_flags
-		filp->f_flags &= ~F_OSPRD_LOCKED;
+			if (filp_writable)	// opened for writing
+			{
+				write_locked = 0;
+				write_lock_pid = -1;
+			}
+			else	// opened for reading
+			{
+				d->num_read_locks--;
 
-		// Wake up the wait queue
-		wake_up_all(&d->blockq);
+				// Delete this pid from read lock list
+			}
 
-		r = 0
+			// Wake up the wait queue
+			wake_up_all(&d->blockq);
+
+			r = 0
+		}
 
 		//************ IN PROGRESS ********************************************
 
