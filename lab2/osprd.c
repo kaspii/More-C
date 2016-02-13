@@ -43,6 +43,21 @@ MODULE_AUTHOR("Shalini and Katie");
 static int nsectors = 32;
 module_param(nsectors, int, 0);
 
+/* Linked list implementation */
+typedef struct mList
+{
+	struct list_head list;
+	pid_t pid;
+} mlist_t;
+
+/* Add the pid to the end of the list */
+addToList(pid_t pid, mlist_t l)
+{
+	mlist_t *tmp;
+	tmp = (mlist_t *)malloc(sizeof(mlist_t));
+	&tmp->pid = pid;
+	list_add(&(tmp->list), &(l.list));
+}
 
 /* The internal representation of our device. */
 typedef struct osprd_info {
