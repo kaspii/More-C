@@ -357,6 +357,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
+
+			r = 0;
 		}
 		else // opened for reading
 		{
@@ -370,6 +372,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
+
+			r = 0;
 		}
 
 		//************ IN PROGRESS ********************************************
@@ -384,8 +388,48 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Otherwise, if we can grant the lock request, return 0.
 
 		// Your code here (instead of the next two lines).
-		eprintk("Attempting to try acquire\n");
-		r = -ENOTTY;
+		// eprintk("Attempting to try acquire\n");
+		// r = -ENOTTY;
+
+		//************ IN PROGRESS ********************************************
+		//************ NEED TO PROTECT CRIT SECTIONS WITH SPINLOCKS ***********
+
+		if (filp_writable) // opened for writing
+		{
+			if (d->write_locked == 0 && d->num_read_locks == 0)
+			{
+				d->write_locked = 1;
+
+				// Mark file as locked
+				filp->f_flags |= F_OSPRD_LOCKED;
+
+				r = 0;
+			}
+			else
+			{
+				// If not possible to lock, return BUSY (instead of blocking)
+				r = -EBUSY;
+			}
+		}
+		else
+		{
+			if (d->write_locked == 0)
+			{
+				d->num_read_locks++;
+
+				// Mark file as locked
+				filp->f_flags |= F_OSPRD_LOCKED;
+
+				r = 0;
+			}
+			else
+			{
+				// If not possible to lock, return BUSY (instead of blocking)
+				r = -EBUSY;
+			}
+		}
+
+		//************ IN PROGRESS ********************************************
 
 	} else if (cmd == OSPRDIOCRELEASE) {
 
