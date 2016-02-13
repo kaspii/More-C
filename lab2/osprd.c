@@ -186,7 +186,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			{
 				d->write_locked = 0;
 				// Now, no process has the write lock
-				d->write_lock_pi.kjlmld = -1;
+				d->write_lock_pid = -1;
 			}
 		}
 		else // opened for reading
