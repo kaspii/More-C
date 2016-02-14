@@ -13,6 +13,7 @@
 #include <linux/blkdev.h>
 #include <linux/wait.h>
 #include <linux/file.h>
+//#include <stdlib.h>
 
 #include "spinlock.h"
 #include "osprd.h"
@@ -55,7 +56,7 @@ void addToList(pid_t pid, mlist_t l)
 {
 	mlist_t *tmp;
 	tmp = (mlist_t *)malloc(sizeof(mlist_t));
-	&tmp->pid = pid;
+	tmp->pid = pid;
 	list_add(&(tmp->list), &(l.list));
 }
 
@@ -63,12 +64,12 @@ void addToList(pid_t pid, mlist_t l)
 void deleteList(mlist_t l)
 {
 	struct list_head *pos, *q;
-	mlist_t *tmp
+	mlist_t *tmp;
 
 	list_for_each_safe(pos, q, &l.list)
 	{
 		tmp = list_entry(pos, mlist_t, list);
-		printf("freeing pid %d\n", tmp->pid);
+		// printf("freeing pid %d\n", tmp->pid);
 		list_del(pos);
 		free(tmp);
 	}
@@ -101,7 +102,7 @@ typedef struct osprd_info {
 
 	int num_read_locks;				// Indicates the number of read locks on the file
 
-
+	//mlist_t read_lock_pids;			// Linked list of read lock pids
 	// The following elements are used internally; you don't need
 	// to understand them.
 	struct request_queue *queue;    // The device request queue.
@@ -241,6 +242,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 				{
 					// Delete the entire list of readers
 					d->num_read_locks = 0;	
+					// deleteList(d->read_lock_pids);
 				}
 			}
 
@@ -458,8 +460,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			if (filp_writable)	// opened for writing
 			{
-				write_locked = 0;
-				write_lock_pid = -1;
+				d->write_locked = 0;
+				d->write_lock_pid = -1;
 			}
 			else	// opened for reading
 			{
@@ -471,7 +473,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// Wake up the wait queue
 			wake_up_all(&d->blockq);
 
-			r = 0
+			r = 0;
 		}
 
 		//************ IN PROGRESS ********************************************
