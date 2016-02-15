@@ -59,6 +59,24 @@ void addToList(pid_t pid, mlist_t l)
 	list_add(&(tmp->list), &(l.list));
 }
 
+/* Remove the pid from the list */
+void removeFromList(pid_t pid, mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+
+		if(tmp->pid == pid)
+		{
+			list_del(pos);
+			kfree(tmp);
+		}
+	}
+}
+
 /* Delete the list and deallocate */
 void deleteList(mlist_t l)
 {
@@ -68,7 +86,6 @@ void deleteList(mlist_t l)
 	list_for_each_safe(pos, q, &l.list)
 	{
 		tmp = list_entry(pos, mlist_t, list);
-		// printf("freeing pid %d\n", tmp->pid);
 		list_del(pos);
 		kfree(tmp);
 	}
