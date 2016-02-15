@@ -101,7 +101,7 @@ typedef struct osprd_info {
 
 	int num_read_locks;				// Indicates the number of read locks on the file
 
-	//mlist_t read_lock_pids;			// Linked list of read lock pids
+	mlist_t read_lock_pids;			// Linked list of read lock pids
 	// The following elements are used internally; you don't need
 	// to understand them.
 	struct request_queue *queue;    // The device request queue.
@@ -241,7 +241,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 				{
 					// Delete the entire list of readers
 					d->num_read_locks = 0;	
-					// deleteList(d->read_lock_pids);
+					deleteList(d->read_lock_pids);
 				}
 			}
 
@@ -364,6 +364,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			// This file now has another read lock
 			d->num_read_locks++;
+			addToList(current->pid, d->read_lock_pids);
 
 			// Update the ticket list
 			d->ticket_tail++;
@@ -417,6 +418,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			{
 				// This file now has another read lock
 				d->num_read_locks++;
+				addToList(current->pid, d->read_lock_pids);
 
 				// Mark file as locked
 				filp->f_flags |= F_OSPRD_LOCKED;
