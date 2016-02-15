@@ -374,7 +374,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		// Deadlock cases
 		// If the current process already has the write lock, it cannot
-		// request a write lock
+		// request another lock
 		if (current->pid == d->write_lock_pid)
 		{
 			return -EDEADLK;
@@ -421,7 +421,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				return -EDEADLK;
 			}
 
-			wait_event_interruptible(d->blockq, !d->write_locked && d->ticket_tail >= local_ticket);
+			int wait_signal = wait_event_interruptible(d->blockq, !d->write_locked && d->ticket_tail >= local_ticket);
+
+			// If the lock request blocks and is awoken by a signal, then
+			// return -ERESTARTSYS.
+			if (wait_signal == -ERESTARTSYS)
+			{
+				return -ERESTARTSYS;
+			}
 
 			osp_spin_lock(&d->mutex);
 			// This file now has another read lock
@@ -478,7 +485,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				r = -EBUSY;
 			}
 		}
-		else
+		else  // opened for reading
 		{
 			osp_spin_lock(&d->mutex);
 			if (d->write_locked == 0)
@@ -521,7 +528,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// If the file hasn't locked the ramdisk, return -EINVAL.
 		if (!(filp->f_flags & F_OSPRD_LOCKED))
 		{
-			r = -EINVAL;
+			return -EINVAL;
 		}
 		else
 		{
