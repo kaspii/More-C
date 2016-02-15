@@ -192,10 +192,12 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 	if (requestType == READ)
 	{
  		memcpy((void*)req->buffer, (void*)data_ptr, num_bytes);
+ 		osp_spin_unlock(&d->mutex);
 	}
  	else if (requestType == WRITE)
  	{
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
+ 		osp_spin_unlock(&d->mutex);
  	}
  	else
  	{
@@ -206,7 +208,6 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 	eprintk("Should process request...\n");
 
 	end_request(req, 1);
-	osp_spin_unlock(&d->mutex);
 }
 
 
