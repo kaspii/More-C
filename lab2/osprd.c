@@ -353,6 +353,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		//************ IN PROGRESS ********************************************
 		//************ NEED TO PROTECT CRIT SECTIONS WITH SPINLOCKS ***********
 
+		// Deadlock cases
+		if (current->pid == d->write_lock_pid)
+		{
+			r = -EDEADLK;
+		}
+
 		// Set a local variable to 'd->ticket_head' and increment 'd->ticket_head'
 		int local_ticket = d->ticket_head;
 
