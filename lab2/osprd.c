@@ -512,6 +512,9 @@ static void osprd_setup(osprd_info_t *d)
 	osp_spin_lock_init(&d->mutex);
 	d->ticket_head = d->ticket_tail = 0;
 
+	/* Initialize reader list */
+	INIT_LIST_HEAD(&(d->read_lock_pids.list));
+
 	/* Add code here if you add fields to osprd_info_t. */
 	d->num_read_locks = 0;
 	d->write_lock_pid = -1;
