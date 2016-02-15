@@ -59,6 +59,25 @@ void addToList(pid_t pid, mlist_t l)
 	list_add(&(tmp->list), &(l.list));
 }
 
+/* Check whether the pid already exists in the reader list */
+int isPidInList(pid_t pid, mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+
+		if(tmp->pid == pid)
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /* Remove the pid from the list */
 void removeFromList(pid_t pid, mlist_t l)
 {
