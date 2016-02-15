@@ -13,7 +13,6 @@
 #include <linux/blkdev.h>
 #include <linux/wait.h>
 #include <linux/file.h>
-//#include <stdlib.h>
 
 #include "spinlock.h"
 #include "osprd.h"
@@ -55,7 +54,7 @@ typedef struct mList
 void addToList(pid_t pid, mlist_t l)
 {
 	mlist_t *tmp;
-	tmp = (mlist_t *)malloc(sizeof(mlist_t));
+	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
 	tmp->pid = pid;
 	list_add(&(tmp->list), &(l.list));
 }
@@ -71,7 +70,7 @@ void deleteList(mlist_t l)
 		tmp = list_entry(pos, mlist_t, list);
 		// printf("freeing pid %d\n", tmp->pid);
 		list_del(pos);
-		free(tmp);
+		kfree(tmp);
 	}
 }
 
