@@ -486,6 +486,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				d->num_read_locks--;
 
 				// Delete this pid from read lock list
+				removeFromList(current->pid, d->read_lock_pids);
 			}
 
 			// Wake up the wait queue
