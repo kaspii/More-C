@@ -373,9 +373,11 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		//************ NEED TO PROTECT CRIT SECTIONS WITH SPINLOCKS ***********
 
 		// Deadlock cases
+		// If the current process already has the write lock, it cannot
+		// request a write lock
 		if (current->pid == d->write_lock_pid)
 		{
-			r = -EDEADLK;
+			return -EDEADLK;
 		}
 
 		// Set a local variable to 'd->ticket_head' and increment 'd->ticket_head'
@@ -412,6 +414,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else // opened for reading
 		{
+			// If the current process already has a read lock, it cannot
+			// request another read lock
+			if (isPidInList(current->pid, d->read_lock_pids))
+			{
+				return -EDEADLK;
+			}
+
 			wait_event_interruptible(d->blockq, !d->write_locked && d->ticket_tail >= local_ticket);
 
 			osp_spin_lock(&d->mutex);
