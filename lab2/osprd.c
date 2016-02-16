@@ -43,12 +43,77 @@ MODULE_AUTHOR("Shalini and Katie");
 static int nsectors = 32;
 module_param(nsectors, int, 0);
 
+#define NOSPRD 4
+static osprd_info_t osprds[NOSPRD];
+
 /* Linked list implementation */
 typedef struct mList
 {
 	struct list_head list;
 	pid_t pid;
 } mlist_t;
+
+/* Add the pid to the end of the list */
+mlist_t *addToList(pid_t pid, mlist_t l)
+{
+	mlist_t *tmp;
+	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
+	tmp->pid = pid;
+	list_add(&(tmp->list), &(l.list));
+	return tmp;
+}
+
+/* Check whether the pid already exists in the reader list */
+int isPidInList(pid_t pid, mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+
+		if(tmp->pid == pid)
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/* TICKET FUNCTIONS */
+/* Remove the pid from the list */
+void removeFromList(pid_t pid, mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+
+		if(tmp->pid == pid)
+		{
+			list_del(pos);
+			kfree(tmp);
+		}
+	}
+}
+
+/* Delete the list and deallocate */
+void deleteList(mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+		list_del(pos);
+		kfree(tmp);
+	}
+}
 
 void addToTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 {
@@ -93,7 +158,7 @@ void removeFromTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 		list_for_each_safe(pos, q, &l.list)
 		{
 			nextNode = list_entry(pos, mlist_t, list);
-			if(nextNode->list_head == next)
+			if(nextNode->list == next)
 			{
 				d->first_ticket = nextNode;
 				break;
@@ -101,110 +166,6 @@ void removeFromTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 		}
 	}
 }
-
-/* Add the pid to the end of the list */
-mlist_t *addToList(pid_t pid, mlist_t l)
-{
-	mlist_t *tmp;
-	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
-	tmp->pid = pid;
-	list_add(&(tmp->list), &(l.list));
-	return tmp;
-}
-
-/* Check whether the pid already exists in the reader list */
-int isPidInList(pid_t pid, mlist_t l)
-{
-	struct list_head *pos, *q;
-	mlist_t *tmp;
-
-	list_for_each_safe(pos, q, &l.list)
-	{
-		tmp = list_entry(pos, mlist_t, list);
-
-		if(tmp->pid == pid)
-		{
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-/* Remove the pid from the list */
-void removeFromList(pid_t pid, mlist_t l)
-{
-	struct list_head *pos, *q;
-	mlist_t *tmp;
-
-	list_for_each_safe(pos, q, &l.list)
-	{
-		tmp = list_entry(pos, mlist_t, list);
-
-		if(tmp->pid == pid)
-		{
-			list_del(pos);
-			kfree(tmp);
-		}
-	}
-}
-
-/* Delete the list and deallocate */
-void deleteList(mlist_t l)
-{
-	struct list_head *pos, *q;
-	mlist_t *tmp;
-
-	list_for_each_safe(pos, q, &l.list)
-	{
-		tmp = list_entry(pos, mlist_t, list);
-		list_del(pos);
-		kfree(tmp);
-	}
-}
-
-/* The internal representation of our device. */
-typedef struct osprd_info {
-	uint8_t *data;                  // The data array. Its size is
-	                                // (nsectors * SECTOR_SIZE) bytes.
-
-	osp_spinlock_t mutex;           // Mutex for synchronizing access to
-					// this block device
-
-	unsigned ticket_head;		// Currently running ticket for
-					// the device lock
-
-	unsigned ticket_tail;		// Next available ticket for
-					// the device lock
-
-	mlist_t tickets; //linked list of tickets
-	mlist_t *first_ticket; //points to first-served ticket in queue
-
-	wait_queue_head_t blockq;       // Wait queue for tasks blocked on
-					// the device lock
-
-	/* HINT: You may want to add additional fields to help
-	         in detecting deadlock. */
-
-	int write_locked;				// Should only ever be 0 or 1.
-									// Indicates whether the file is write locked
-
-	int write_lock_pid;				// PID of the process that holds the write lock
-
-	int num_read_locks;				// Indicates the number of read locks on the file
-
-	mlist_t read_lock_pids;			// Linked list of read lock pids
-	// The following elements are used internally; you don't need
-	// to understand them.
-	struct request_queue *queue;    // The device request queue.
-	spinlock_t qlock;		// Used internally for mutual
-	                                //   exclusion in the 'queue'.
-	struct gendisk *gd;             // The generic disk.
-} osprd_info_t;
-
-#define NOSPRD 4
-static osprd_info_t osprds[NOSPRD];
-
 
 // Declare useful helper functions
 
