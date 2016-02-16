@@ -59,12 +59,18 @@ typedef struct ticketList
 } ticketList_t;
 
 /* Add the pid to the end of the list */
-void addToList(pid_t pid, mlist_t l)
+/* Returns 0 if the add failed, 1 if it succeeded */
+int addToList(pid_t pid, mlist_t l)
 {
 	mlist_t *tmp;
 	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
+
+	if(tmp == NULL)
+		return 0;
+
 	tmp->pid = pid;
 	list_add_tail(&(tmp->list), &(l.list));
+	return 1;
 }
 
 /* Check whether the pid already exists in the reader list */
@@ -151,10 +157,14 @@ int removeOneFromList(pid_t pid, mlist_t l)
 	return found;
 }
 
-void addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
+int addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
 {
 	ticketList_t *tmp;
 	tmp = (ticketList_t *)kmalloc(sizeof(ticketList_t), __GFP_NORETRY);
+
+	if(tmp == NULL)
+		return 0;
+
 	tmp->ticketNum = ticket;
 	list_add_tail(&(tmp->list), &(l->list));
 	
@@ -162,6 +172,8 @@ void addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
 	{
 		first = tmp;
 	}
+
+	return 1;
 }
 
 
@@ -501,7 +513,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		//add pid to end of ticket list
-		addToTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+		int success = addToTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+
+		if(!success)
+		{
+			return -ENOMEM;
+		}
+
 		local_ticket = d->ticket_tail;
 		d->ticket_tail++;
 		osp_spin_unlock(&d->mutex);
@@ -561,7 +579,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			// This file now has another read lock
 			d->num_read_locks++;
-			addToList(current->pid, d->read_lock_pids);
+			int success = addToList(current->pid, d->read_lock_pids);
+
+			if(!success)
+			{
+				return -ENOMEM;
+			}
 			
 			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 
@@ -629,7 +652,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			{
 				// This file now has another read lock
 				d->num_read_locks++;
-				addToList(current->pid, d->read_lock_pids);
+				int success = addToList(current->pid, d->read_lock_pids);
+				
+				if(!success)
+				{
+					return -ENOMEM;
+				}
+				
 				osp_spin_unlock(&d->mutex);
 
 				r = 0;
