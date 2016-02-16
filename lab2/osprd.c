@@ -59,13 +59,12 @@ typedef struct ticketList
 } ticketList_t;
 
 /* Add the pid to the end of the list */
-mlist_t *addToList(pid_t pid, mlist_t l)
+void addToList(pid_t pid, mlist_t l)
 {
 	mlist_t *tmp;
 	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
 	tmp->pid = pid;
 	list_add(&(tmp->list), &(l.list));
-	return tmp;
 }
 
 /* Check whether the pid already exists in the reader list */
@@ -120,10 +119,23 @@ void removeFromList(pid_t pid, mlist_t l)
 		{
 			list_del(pos);
 			kfree(tmp);
-			return tmp;
 		}
 	}
 }
+
+void addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
+{
+	ticketList_t *tmp;
+	tmp = (ticketList_t *)kmalloc(sizeof(ticketList_t), __GFP_NORETRY);
+	tmp->ticketNum = ticket;
+	list_add(&(tmp->list), &(l->list));
+	
+	if(first == NULL)
+	{
+		first = tmp;
+	}
+}
+
 
 ticketList_t *removeTicketFromList(int ticket, ticketList_t *l, ticketList_t *first)
 {
@@ -480,11 +492,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		//add pid to end of ticket list
 		mlist_t* tmp;
-		tmp = addToList(current->pid, d->tickets);
-		if(d->first_ticket == NULL)
-		{
-			d->first_ticket = tmp;
-		}
+		addToTicketList(d->ticket_tail, d->tickets, d->first_ticket);
+		
 		osp_spin_unlock(&d->mutex);
 
 		// osp_spin_lock(&d->mutex);
@@ -500,50 +509,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				mlist_t* tmp;
-				struct list_head *pos, *q;
-				int isFirstTicket = 0;
-				//tmp = removeFromList(current->pid, d->tickets);
- 				struct list_head *next;
-			 	list_for_each_safe(pos, q, &d->tickets.list)
-				{
-					tmp = list_entry(pos, mlist_t, list);
-
-					if(tmp->pid == current->pid)
-					{
-						if(tmp == d->first_ticket)
- 							isFirstTicket = 1;
-
-						next = pos->next;
-						list_del(pos);
-						kfree(tmp);
-					}
-				}
-				//reset first_ticket if we just deleted first_ticket
-				if(isFirstTicket)
-				{			
-					//find out which node contains the list_head next
-					struct list_head *pos, *q;
-					mlist_t *nextNode;
-
-					list_for_each_safe(pos, q, &d->tickets.list)
-					{
-						nextNode = list_entry(pos, mlist_t, list);
-						if(&nextNode->list == next)
-						{
-							d->first_ticket = nextNode;
-							break;
-						} 
-					}
-				}
-				// if (local_ticket == d->ticket_tail)
-				// {
-				// 	d->ticket_tail++;
-				// }
-				// else
-				// {
-				// 	d->ticket_head--;
-				// }
+				removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -556,43 +522,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// // Update the ticket list
 			// d->ticket_tail++;
 
-			//removeFromTicketList(current->pid, d);
-			mlist_t* tmp;
-				struct list_head *pos, *q;
-				int isFirstTicket = 0;
-				//tmp = removeFromList(current->pid, d->tickets);
- 				struct list_head *next;
-			 	list_for_each_safe(pos, q, &d->tickets.list)
-				{
-					tmp = list_entry(pos, mlist_t, list);
-
-					if(tmp->pid == current->pid)
-					{
-						if(tmp == d->first_ticket)
- 							isFirstTicket = 1;
-
-						next = pos->next;
-						list_del(pos);
-						kfree(tmp);
-					}
-				}
-				//reset first_ticket if we just deleted first_ticket
-				if(isFirstTicket)
-				{			
-					//find out which node contains the list_head next
-					struct list_head *pos, *q;
-					mlist_t *nextNode;
-
-					list_for_each_safe(pos, q, &d->tickets.list)
-					{
-						nextNode = list_entry(pos, mlist_t, list);
-						if(&nextNode->list == next)
-						{
-							d->first_ticket = nextNode;
-							break;
-						} 
-					}
-				}
+			removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -610,51 +540,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				// if (local_ticket == d->ticket_tail)
-    //                             {
-    //                                     d->ticket_tail++;
-    //                             }
-    //                             else
-    //                             {
-    //                                     d->ticket_head--;
-    //                             }
-				//removeFromTicketList(current->pid, d);
-				mlist_t* tmp;
-				struct list_head *pos, *q;
-				int isFirstTicket = 0;
-				//tmp = removeFromList(current->pid, d->tickets);
- 				struct list_head *next;
-			 	list_for_each_safe(pos, q, &d->tickets.list)
-				{
-					tmp = list_entry(pos, mlist_t, list);
-
-					if(tmp->pid == current->pid)
-					{
-						if(tmp == d->first_ticket)
- 							isFirstTicket = 1;
-
-						next = pos->next;
-						list_del(pos);
-						kfree(tmp);
-					}
-				}
-				//reset first_ticket if we just deleted first_ticket
-				if(isFirstTicket)
-				{			
-					//find out which node contains the list_head next
-					struct list_head *pos, *q;
-					mlist_t *nextNode;
-
-					list_for_each_safe(pos, q, &d->tickets.list)
-					{
-						nextNode = list_entry(pos, mlist_t, list);
-						if(&nextNode->list == next)
-						{
-							d->first_ticket = nextNode;
-							break;
-						} 
-					}
-				}
+				removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -666,43 +552,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			// Update the ticket list
 			// d->ticket_tail++;
-			//removeFromTicketList(current->pid, d);
-			mlist_t* tmp;
-				struct list_head *pos, *q;
-				int isFirstTicket = 0;
-				//tmp = removeFromList(current->pid, d->tickets);
- 				struct list_head *next;
-			 	list_for_each_safe(pos, q, &d->tickets.list)
-				{
-					tmp = list_entry(pos, mlist_t, list);
-
-					if(tmp->pid == current->pid)
-					{
-						if(tmp == d->first_ticket)
- 							isFirstTicket = 1;
-
-						next = pos->next;
-						list_del(pos);
-						kfree(tmp);
-					}
-				}
-				//reset first_ticket if we just deleted first_ticket
-				if(isFirstTicket)
-				{			
-					//find out which node contains the list_head next
-					struct list_head *pos, *q;
-					mlist_t *nextNode;
-
-					list_for_each_safe(pos, q, &d->tickets.list)
-					{
-						nextNode = list_entry(pos, mlist_t, list);
-						if(&nextNode->list == next)
-						{
-							d->first_ticket = nextNode;
-							break;
-						} 
-					}
-				}
+			
+			removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
