@@ -531,6 +531,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			if (isPidInList(current->pid, d->read_lock_pids))
 			{
+				// Deadlock: we don't want to service this ticket anymore
+				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -EDEADLK;
 			}
@@ -577,14 +579,15 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 
 			osp_spin_lock(&d->mutex);
+			
 			// This file now has another read lock
-			d->num_read_locks++;
 			int success = addToList(current->pid, d->read_lock_pids);
-
+			// If we are not able to allocate memory for this reader, return
 			if(!success)
 			{
 				return -ENOMEM;
 			}
+			d->num_read_locks++;
 			
 			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 
@@ -618,7 +621,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// If the current process already has the write lock, it cannot
 		// request another lock
 		osp_spin_lock(&d->mutex);
-		if (d->first_ticket->ticketNum == d->ticket_tail)
+		if (d->first_ticket->ticketNum != d->ticket_tail)
 		{
 			osp_spin_unlock(&d->mutex);
 			return -EBUSY;
@@ -651,13 +654,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (d->write_locked == 0)
 			{
 				// This file now has another read lock
-				d->num_read_locks++;
+
 				int success = addToList(current->pid, d->read_lock_pids);
-				
+				// If we are not able to allocate memory for the reader, return.
 				if(!success)
 				{
 					return -ENOMEM;
 				}
+				d->num_read_locks++;
 				
 				osp_spin_unlock(&d->mutex);
 
@@ -715,8 +719,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 			else	// opened for reading
 			{
-				d->num_read_locks--;
-
 				// Delete this pid from read lock list
 				int count = removeOneFromList(current->pid, d->read_lock_pids);
 
@@ -730,6 +732,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					osp_spin_unlock(&d->mutex);
 					return -EINVAL;
 				}
+				
+				d->num_read_locks--;
 
 			}
 
