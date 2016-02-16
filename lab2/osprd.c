@@ -43,14 +43,13 @@ MODULE_AUTHOR("Shalini and Katie");
 static int nsectors = 32;
 module_param(nsectors, int, 0);
 
-#define NOSPRD 4
-static osprd_info_t osprds[NOSPRD];
 
 /* Linked list implementation */
 typedef struct mList
 {
 	struct list_head list;
 	pid_t pid;
+	int isFirstTicket;
 } mlist_t;
 
 /* Add the pid to the end of the list */
@@ -84,7 +83,7 @@ int isPidInList(pid_t pid, mlist_t l)
 
 /* TICKET FUNCTIONS */
 /* Remove the pid from the list */
-void removeFromList(pid_t pid, mlist_t l)
+mlist_t* removeFromList(pid_t pid, mlist_t l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
@@ -97,6 +96,7 @@ void removeFromList(pid_t pid, mlist_t l)
 		{
 			list_del(pos);
 			kfree(tmp);
+			return tmp;
 		}
 	}
 }
@@ -115,58 +115,95 @@ void deleteList(mlist_t l)
 	}
 }
 
-void addToTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
-{
-	mlist_t *tmp;
-	tmp = addToList(pid, l);
 
-	if(first_ticket == NULL)
-	{
-		d->first_ticket = tmp;
-	}
-}
+/* The internal representation of our device. */
+typedef struct osprd_info {
+	uint8_t *data;                  // The data array. Its size is
+	                                // (nsectors * SECTOR_SIZE) bytes.
 
-void removeFromTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
-{
-	struct list_head *pos, *q;
-	mlist_t *tmp;
-	struct list_head *next;
-	int isFirstTicket = 0;
+	osp_spinlock_t mutex;           // Mutex for synchronizing access to
+					// this block device
 
-	list_for_each_safe(pos, q, &l.list)
-	{
-		tmp = list_entry(pos, mlist_t, list);
+	unsigned ticket_head;		// Currently running ticket for
+					// the device lock
 
-		if(tmp->pid == pid)
-		{
-			if(tmp == d->first_ticket)
-				isFirstTicket = 1;
+	unsigned ticket_tail;		// Next available ticket for
+					// the device lock
 
-			next = pos->next;
-			list_del(pos);
-			kfree(tmp);
-		}
-	}
+	mlist_t tickets; //linked list of tickets
+	mlist_t *first_ticket; //points to first-served ticket in queue
 
-	//reset first_ticket if we just deleted first_ticket
-	if(isFirstTicket)
-	{
-		//find out which node contains the list_head next
-		struct list_head *pos, *q;
-		mlist_t *nextNode;
+	wait_queue_head_t blockq;       // Wait queue for tasks blocked on
+					// the device lock
 
-		list_for_each_safe(pos, q, &l.list)
-		{
-			nextNode = list_entry(pos, mlist_t, list);
-			if(nextNode->list == next)
-			{
-				d->first_ticket = nextNode;
-				break;
-			} 
-		}
-	}
-}
+	/* HINT: You may want to add additional fields to help
+	         in detecting deadlock. */
 
+	int write_locked;				// Should only ever be 0 or 1.
+									// Indicates whether the file is write locked
+
+	int write_lock_pid;				// PID of the process that holds the write lock
+
+	int num_read_locks;				// Indicates the number of read locks on the file
+
+	mlist_t read_lock_pids;			// Linked list of read lock pids
+	// The following elements are used internally; you don't need
+	// to understand them.
+	struct request_queue *queue;    // The device request queue.
+	spinlock_t qlock;		// Used internally for mutual
+	                                //   exclusion in the 'queue'.
+	struct gendisk *gd;             // The generic disk.
+} osprd_info_t;
+
+// void addToTicketList(pid_t pid, osprd_info_t* d)
+// {
+// 	mlist_t *tmp;
+// 	tmp = addToList(pid, d->tickets);
+// }
+
+// void removeFromTicketList(pid_t pid, osprd_info_t* d)
+// {
+// 	struct list_head *pos, *q;
+// 	mlist_t *tmp;
+// 	struct list_head *next;
+// 	int isFirstTicket = 0;
+
+// 	list_for_each_safe(pos, q, &d->tickets.list)
+// 	{
+// 		tmp = list_entry(pos, mlist_t, list);
+
+// 		if(tmp->pid == pid)
+// 		{
+// 			if(tmp == d->first_ticket)
+// 				isFirstTicket = 1;
+
+// 			next = pos->next;
+// 			list_del(pos);
+// 			kfree(tmp);
+// 		}
+// 	}
+
+// 	//reset first_ticket if we just deleted first_ticket
+// 	if(isFirstTicket)
+// 	{
+// 		//find out which node contains the list_head next
+// 		struct list_head *pos, *q;
+// 		mlist_t *nextNode;
+
+// 		list_for_each_safe(pos, q, &d->tickets.list)
+// 		{
+// 			nextNode = list_entry(pos, mlist_t, list);
+// 			if(nextNode->list_head == next)
+// 			{
+// 				d->first_ticket = nextNode;
+// 				break;
+// 			} 
+// 		}
+// 	}
+// }
+
+#define NOSPRD 4
+static osprd_info_t osprds[NOSPRD];
 // Declare useful helper functions
 
 /*
@@ -302,7 +339,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 					deleteList(d->read_lock_pids);
 				//}
 			}
-			osp_spin_unlock(&d->blockq);
+			osp_spin_unlock(&d->mutex);
 			// Clear the file of the locked flag
 			//filp->f_flags &= ~F_OSPRD_LOCKED;
 			// wake up all blocked processes
@@ -415,7 +452,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Set a local variable to 'd->ticket_head' and increment 'd->ticket_head'
 		//local_ticket = d->ticket_head;
 		osp_spin_lock(&d->mutex);
-		addToTicketList(current->pid, d->tickets);
+		mlist_t* tmp;
+		tmp = addToList(current->pid, d->tickets);
+		if(d->first_ticket == NULL)
+		{
+			d->first_ticket = tmp;
+		}
 		osp_spin_unlock(&d->mutex);
 
 		// osp_spin_lock(&d->mutex);
@@ -431,7 +473,42 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				removeFromTicketList(current->pid, d->tickets, d);
+				mlist_t* tmp;
+				struct list_head *pos, *q;
+				int isFirstTicket = 0;
+				//tmp = removeFromList(current->pid, d->tickets);
+ 				struct list_head *next;
+			 	list_for_each_safe(pos, q, &d->tickets.list)
+				{
+					tmp = list_entry(pos, mlist_t, list);
+
+					if(tmp->pid == current->pid)
+					{
+						if(tmp == d->first_ticket)
+ 							isFirstTicket = 1;
+
+						next = pos->next;
+						list_del(pos);
+						kfree(tmp);
+					}
+				}
+				//reset first_ticket if we just deleted first_ticket
+				if(isFirstTicket)
+				{			
+					//find out which node contains the list_head next
+					struct list_head *pos, *q;
+					mlist_t *nextNode;
+
+					list_for_each_safe(pos, q, &d->tickets.list)
+					{
+						nextNode = list_entry(pos, mlist_t, list);
+						if(&nextNode->list == next)
+						{
+							d->first_ticket = nextNode;
+							break;
+						} 
+					}
+				}
 				// if (local_ticket == d->ticket_tail)
 				// {
 				// 	d->ticket_tail++;
@@ -452,7 +529,43 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// // Update the ticket list
 			// d->ticket_tail++;
 
-			removeFromTicketList(current->pid, d->tickets, d);
+			//removeFromTicketList(current->pid, d);
+			mlist_t* tmp;
+				struct list_head *pos, *q;
+				int isFirstTicket = 0;
+				//tmp = removeFromList(current->pid, d->tickets);
+ 				struct list_head *next;
+			 	list_for_each_safe(pos, q, &d->tickets.list)
+				{
+					tmp = list_entry(pos, mlist_t, list);
+
+					if(tmp->pid == current->pid)
+					{
+						if(tmp == d->first_ticket)
+ 							isFirstTicket = 1;
+
+						next = pos->next;
+						list_del(pos);
+						kfree(tmp);
+					}
+				}
+				//reset first_ticket if we just deleted first_ticket
+				if(isFirstTicket)
+				{			
+					//find out which node contains the list_head next
+					struct list_head *pos, *q;
+					mlist_t *nextNode;
+
+					list_for_each_safe(pos, q, &d->tickets.list)
+					{
+						nextNode = list_entry(pos, mlist_t, list);
+						if(&nextNode->list == next)
+						{
+							d->first_ticket = nextNode;
+							break;
+						} 
+					}
+				}
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -478,7 +591,43 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
     //                             {
     //                                     d->ticket_head--;
     //                             }
-				removeFromTicketList(current->pid, d->tickets, d);
+				//removeFromTicketList(current->pid, d);
+				mlist_t* tmp;
+				struct list_head *pos, *q;
+				int isFirstTicket = 0;
+				//tmp = removeFromList(current->pid, d->tickets);
+ 				struct list_head *next;
+			 	list_for_each_safe(pos, q, &d->tickets.list)
+				{
+					tmp = list_entry(pos, mlist_t, list);
+
+					if(tmp->pid == current->pid)
+					{
+						if(tmp == d->first_ticket)
+ 							isFirstTicket = 1;
+
+						next = pos->next;
+						list_del(pos);
+						kfree(tmp);
+					}
+				}
+				//reset first_ticket if we just deleted first_ticket
+				if(isFirstTicket)
+				{			
+					//find out which node contains the list_head next
+					struct list_head *pos, *q;
+					mlist_t *nextNode;
+
+					list_for_each_safe(pos, q, &d->tickets.list)
+					{
+						nextNode = list_entry(pos, mlist_t, list);
+						if(&nextNode->list == next)
+						{
+							d->first_ticket = nextNode;
+							break;
+						} 
+					}
+				}
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -486,11 +635,47 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			// This file now has another read lock
 			d->num_read_locks++;
-			addToTicketList(current->pid, d->read_lock_pids);
+			addToList(current->pid, d->read_lock_pids);
 
 			// Update the ticket list
 			// d->ticket_tail++;
-			removeFromTicketList(current->pid, d->tickets, d);
+			//removeFromTicketList(current->pid, d);
+			mlist_t* tmp;
+				struct list_head *pos, *q;
+				int isFirstTicket = 0;
+				//tmp = removeFromList(current->pid, d->tickets);
+ 				struct list_head *next;
+			 	list_for_each_safe(pos, q, &d->tickets.list)
+				{
+					tmp = list_entry(pos, mlist_t, list);
+
+					if(tmp->pid == current->pid)
+					{
+						if(tmp == d->first_ticket)
+ 							isFirstTicket = 1;
+
+						next = pos->next;
+						list_del(pos);
+						kfree(tmp);
+					}
+				}
+				//reset first_ticket if we just deleted first_ticket
+				if(isFirstTicket)
+				{			
+					//find out which node contains the list_head next
+					struct list_head *pos, *q;
+					mlist_t *nextNode;
+
+					list_for_each_safe(pos, q, &d->tickets.list)
+					{
+						nextNode = list_entry(pos, mlist_t, list);
+						if(&nextNode->list == next)
+						{
+							d->first_ticket = nextNode;
+							break;
+						} 
+					}
+				}
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -659,6 +844,8 @@ static void osprd_setup(osprd_info_t *d)
 
 	/* Initialize reader list */
 	INIT_LIST_HEAD(&(d->read_lock_pids.list));
+	// Initialize ticket list
+	INIT_LIST_HEAD(&(d->tickets.list));
 
 	/* Add code here if you add fields to osprd_info_t. */
 	d->num_read_locks = 0;
