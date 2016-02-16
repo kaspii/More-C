@@ -77,7 +77,7 @@ void removeFromTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 			if(tmp == d->first_ticket)
 				isFirstTicket = 1;
 
-			next = tmp->list_head->next;
+			next = pos->next;
 			list_del(pos);
 			kfree(tmp);
 		}
@@ -458,7 +458,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				removeFromTicketList(current->pid, d->tickets);
+				removeFromTicketList(current->pid, d->tickets, d);
 				// if (local_ticket == d->ticket_tail)
 				// {
 				// 	d->ticket_tail++;
@@ -479,7 +479,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// // Update the ticket list
 			// d->ticket_tail++;
 
-			removeFromTicketList(current->pid, d->tickets);
+			removeFromTicketList(current->pid, d->tickets, d);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -505,7 +505,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
     //                             {
     //                                     d->ticket_head--;
     //                             }
-				removeFromTicketList(current->pid, d->tickets);
+				removeFromTicketList(current->pid, d->tickets, d);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -517,7 +517,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			// Update the ticket list
 			// d->ticket_tail++;
-			removeFromTicketList(current->pid, d->tickets);
+			removeFromTicketList(current->pid, d->tickets, d);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
