@@ -64,7 +64,7 @@ void addToList(pid_t pid, mlist_t l)
 	mlist_t *tmp;
 	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
 	tmp->pid = pid;
-	list_add(&(tmp->list), &(l.list));
+	list_add_tail(&(tmp->list), &(l.list));
 }
 
 /* Check whether the pid already exists in the reader list */
@@ -131,7 +131,7 @@ void addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
 	ticketList_t *tmp;
 	tmp = (ticketList_t *)kmalloc(sizeof(ticketList_t), __GFP_NORETRY);
 	tmp->ticketNum = ticket;
-	list_add(&(tmp->list), &(l->list));
+	list_add_tail(&(tmp->list), &(l->list));
 	
 	if(first == NULL)
 	{
@@ -472,10 +472,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Deadlock cases
 		// If the current process already has the write lock, it cannot
 		// request another lock
+		osp_spin_lock(&d->mutex);
 		if (current->pid == d->write_lock_pid)
 		{
+			osp_spin_unlock(&d->mutex);
 			return -EDEADLK;
 		}
+		osp_spin_unlock(&d->mutex);
 
 		// If the current process already has a read lock, it cannot
 		// request another lock
