@@ -86,7 +86,19 @@ void removeFromTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 	//reset first_ticket if we just deleted first_ticket
 	if(isFirstTicket)
 	{
-		d->first_ticket = next;
+		//find out which node contains the list_head next
+		struct list_head *pos, *q;
+		mlist_t *nextNode;
+
+		list_for_each_safe(pos, q, &l.list)
+		{
+			nextNode = list_entry(pos, mlist_t, list);
+			if(nextNode->list_head == next)
+			{
+				d->first_ticket = nextNode;
+				break;
+			} 
+		}
 	}
 }
 
