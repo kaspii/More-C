@@ -492,23 +492,20 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		//add pid to end of ticket list
 		addToTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
-		
+		local_ticket = d->ticket_tail;
+		d->ticket_tail++;
 		osp_spin_unlock(&d->mutex);
-
-		// osp_spin_lock(&d->mutex);
-		// d->ticket_head++;
-		// osp_spin_unlock(&d->mutex);
 
 		if (filp_writable) // opened for writing
 		{
-			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->num_read_locks == 0 && d->ticket_tail == d->first_ticket->ticketNum);
+			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->num_read_locks == 0 && local_ticket == d->first_ticket->ticketNum);
 
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -518,10 +515,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->write_locked = 1;
 			d->write_lock_pid = current->pid;
 
-			// // Update the ticket list
-			// d->ticket_tail++;
-
-			removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -532,14 +526,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		else // opened for reading
 		{
 
-			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->ticket_tail == d->first_ticket->ticketNum);
+			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && local_ticket == d->first_ticket->ticketNum);
 
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -548,11 +542,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// This file now has another read lock
 			d->num_read_locks++;
 			addToList(current->pid, d->read_lock_pids);
-
-			// Update the ticket list
-			// d->ticket_tail++;
 			
-			removeFromTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -593,13 +584,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			return -EBUSY;
 		}
-
-		// Set a local variable to 'd->ticket_head' and increment 'd->ticket_head'
-                //local_ticket = d->ticket_head;
-
-                //osp_spin_lock(&d->mutex);
-                //d->ticket_head++;
-                //osp_spin_unlock(&d->mutex);
 
 		if (filp_writable) // opened for writing
 		{
