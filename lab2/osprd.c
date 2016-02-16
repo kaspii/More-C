@@ -50,8 +50,9 @@ typedef struct mList
 	pid_t pid;
 } mlist_t;
 
-void addToTicketList(pid_t pid, mlist_t l, osprd_info d)
+void addToTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 {
+	mlist_t *tmp;
 	tmp = addToList(pid, l);
 
 	if(first_ticket == NULL)
@@ -60,7 +61,7 @@ void addToTicketList(pid_t pid, mlist_t l, osprd_info d)
 	}
 }
 
-void removeFromTicketList(pid_t pid, mlist_t l)
+void removeFromTicketList(pid_t pid, mlist_t l, osprd_info_t* d)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
@@ -116,15 +117,6 @@ int isPidInList(pid_t pid, mlist_t l)
 	}
 
 	return 0;
-}
-
-/* Check whether the pid is at the front of the queue */
-int isFirstInList(pid_t pid, mlist_t l)
-{
-	struct list_head *pos, *q;
-	mlist_t *tmp;
-
-	tmp = list_entry(pos, mlist_t);
 }
 
 /* Remove the pid from the list */
@@ -513,7 +505,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
     //                             {
     //                                     d->ticket_head--;
     //                             }
-				removeFromTicketList(-current>pid, d->tickets);
+				removeFromTicketList(current->pid, d->tickets);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
