@@ -52,6 +52,12 @@ typedef struct mList
 	int isFirstTicket;
 } mlist_t;
 
+typedef struct ticketList
+{
+	struct list_head list;
+	int ticketNum;
+} ticketList_t;
+
 /* Add the pid to the end of the list */
 mlist_t *addToList(pid_t pid, mlist_t l)
 {
@@ -81,9 +87,27 @@ int isPidInList(pid_t pid, mlist_t l)
 	return 0;
 }
 
-/* TICKET FUNCTIONS */
+/* Check whether the ticket already exists in the ticket list */
+int isTicketInList(int ticket, mlist_t l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l.list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+
+		if(tmp->ticketNum == ticket)
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /* Remove the pid from the list */
-mlist_t* removeFromList(pid_t pid, mlist_t l)
+void removeFromList(pid_t pid, mlist_t l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
@@ -99,6 +123,56 @@ mlist_t* removeFromList(pid_t pid, mlist_t l)
 			return tmp;
 		}
 	}
+}
+
+ticketList_t *removeTicketFromList(int ticket, ticketList_t *l, ticketList_t *first)
+{
+	ticketList_t* tmp;
+	struct list_head *pos, *q;
+	int isFirstTicket = 0;
+
+	struct list_head *next;
+ 	list_for_each_safe(pos, q, &l->list)
+	{
+		tmp = list_entry(pos, ticketList_t, list);
+
+		if(tmp->ticketNum == ticket)
+		{
+			if(tmp == first)
+			{
+				isFirstTicket = 1;
+			}
+
+			next = pos->next;
+			list_del(pos);
+			kfree(tmp);
+
+			if(list_empty(&l->list))
+			{
+				first = NULL;
+				return tmp;
+			}
+			break;
+		}
+	}
+	//reset first_ticket if we just deleted first_ticket
+	if(isFirstTicket)
+	{			
+		//find out which node contains the list_head next
+		struct list_head *pos, *q;
+		ticketList_t *nextNode;
+
+		list_for_each_safe(pos, q, &l->list)
+		{
+			nextNode = list_entry(pos, ticketList_t, list);
+			if(&nextNode->list == next)
+			{
+				f = nextNode;
+				break;
+			} 
+		}
+	}
+	return tmp;	
 }
 
 /* Delete the list and deallocate */
@@ -155,52 +229,6 @@ typedef struct osprd_info {
 	struct gendisk *gd;             // The generic disk.
 } osprd_info_t;
 
-// void addToTicketList(pid_t pid, osprd_info_t* d)
-// {
-// 	mlist_t *tmp;
-// 	tmp = addToList(pid, d->tickets);
-// }
-
-// void removeFromTicketList(pid_t pid, osprd_info_t* d)
-// {
-// 	struct list_head *pos, *q;
-// 	mlist_t *tmp;
-// 	struct list_head *next;
-// 	int isFirstTicket = 0;
-
-// 	list_for_each_safe(pos, q, &d->tickets.list)
-// 	{
-// 		tmp = list_entry(pos, mlist_t, list);
-
-// 		if(tmp->pid == pid)
-// 		{
-// 			if(tmp == d->first_ticket)
-// 				isFirstTicket = 1;
-
-// 			next = pos->next;
-// 			list_del(pos);
-// 			kfree(tmp);
-// 		}
-// 	}
-
-// 	//reset first_ticket if we just deleted first_ticket
-// 	if(isFirstTicket)
-// 	{
-// 		//find out which node contains the list_head next
-// 		struct list_head *pos, *q;
-// 		mlist_t *nextNode;
-
-// 		list_for_each_safe(pos, q, &d->tickets.list)
-// 		{
-// 			nextNode = list_entry(pos, mlist_t, list);
-// 			if(nextNode->list_head == next)
-// 			{
-// 				d->first_ticket = nextNode;
-// 				break;
-// 			} 
-// 		}
-// 	}
-// }
 
 #define NOSPRD 4
 static osprd_info_t osprds[NOSPRD];
@@ -449,9 +477,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			return -EDEADLK;
 		}
 
-		// Set a local variable to 'd->ticket_head' and increment 'd->ticket_head'
-		//local_ticket = d->ticket_head;
 		osp_spin_lock(&d->mutex);
+		//add pid to end of ticket list
 		mlist_t* tmp;
 		tmp = addToList(current->pid, d->tickets);
 		if(d->first_ticket == NULL)
