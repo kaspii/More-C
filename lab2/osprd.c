@@ -106,10 +106,11 @@ int isTicketInList(int ticket, mlist_t l)
 }
 
 /* Remove the pid from the list */
-void removeFromList(pid_t pid, mlist_t l)
+int removeFromList(pid_t pid, mlist_t l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
+	int count = 0;
 
 	list_for_each_safe(pos, q, &l.list)
 	{
@@ -119,8 +120,10 @@ void removeFromList(pid_t pid, mlist_t l)
 		{
 			list_del(pos);
 			kfree(tmp);
+			count++;
 		}
 	}
+	return count;
 }
 
 void addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
@@ -361,23 +364,15 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			filp->f_flags &= ~F_OSPRD_LOCKED;
 			if (filp_writable) // opened for writing
 			{
-				// Check if the file is write locked
-				//if (d->write_locked)
-				//{
-					d->write_locked = 0;
-					// Now, no process has the write lock
-					d->write_lock_pid = -1;
-				//}
+				d->write_locked = 0;
+				// Now, no process has the write lock
+				d->write_lock_pid = -1;
 			}
 			else // opened for reading
 			{
-				// Check if the file has read locks
-				//if (d->num_read_locks > 0)
-				//{
-					// Delete the entire list of readers
-					d->num_read_locks = 0;	
-					deleteList(d->read_lock_pids);
-				//}
+				// Delete all of the current process' locks
+				int numLocks = removeFromList(current->pid, d->read_lock_pids);
+				d->num_read_locks -= numLocks;	
 			}
 			osp_spin_unlock(&d->mutex);
 			// Clear the file of the locked flag
