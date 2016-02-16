@@ -333,6 +333,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 	size_t num_bytes = req->current_nr_sectors * SECTOR_SIZE;
 	uint8_t *data_ptr = d->data + offset;
 
+	// Determine whether the request as a READ or WRITE request
 	unsigned int requestType = rq_data_dir(req);
 
 	if ((num_bytes + offset) > (nsectors * SECTOR_SIZE))
@@ -343,10 +344,12 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 
 	if (requestType == READ)
 	{
+		// Copy data from our data array to the request's buffer
  		memcpy((void*)req->buffer, (void*)data_ptr, num_bytes);
 	}
  	else if (requestType == WRITE)
  	{
+ 		// Copy data from the request's buffer to our data array
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
  	}
  	else
@@ -397,10 +400,12 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			{
 				if (current->pid == d->write_lock_pid)
 				{
+					// Remove the write lock
 					d->write_locked = 0;
-					// Now, no process has the write lock
+					// Reset the pid to -1 (no process has the write lock)
 					d->write_lock_pid = -1;
 
+					// Clear the file of the locked flag
 					filp->f_flags ^= F_OSPRD_LOCKED;
 				}
 			}
@@ -409,6 +414,8 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 				// Delete all of the current process' locks
 				int numLocks = removeFromList(current->pid, d->read_lock_pids);
 				d->num_read_locks -= numLocks;
+
+				// If we were able to remove a lock, clear the file of the locked flag
 				if (numLocks > 0)
 				{
 					filp->f_flags ^= F_OSPRD_LOCKED;
@@ -740,7 +747,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					// Return error if it wasn't possible to remove the read lock
 					return -EINVAL;
 				}
-				
+
 				d->num_read_locks--;
 
 			}
