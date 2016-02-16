@@ -90,11 +90,11 @@ int isPidInList(pid_t pid, mlist_t l)
 int isTicketInList(int ticket, mlist_t l)
 {
 	struct list_head *pos, *q;
-	mlist_t *tmp;
+	ticketList_t *tmp;
 
 	list_for_each_safe(pos, q, &l.list)
 	{
-		tmp = list_entry(pos, mlist_t, list);
+		tmp = list_entry(pos, ticketList_t, list);
 
 		if(tmp->ticketNum == ticket)
 		{
@@ -137,7 +137,7 @@ void addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
 }
 
 
-ticketList_t *removeTicketFromList(int ticket, ticketList_t *l, ticketList_t *first)
+ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t *first)
 {
 	ticketList_t* tmp;
 	struct list_head *pos, *q;
@@ -179,7 +179,7 @@ ticketList_t *removeTicketFromList(int ticket, ticketList_t *l, ticketList_t *fi
 			nextNode = list_entry(pos, ticketList_t, list);
 			if(&nextNode->list == next)
 			{
-				f = nextNode;
+				first = nextNode;
 				break;
 			} 
 		}
@@ -216,8 +216,8 @@ typedef struct osprd_info {
 	unsigned ticket_tail;		// Next available ticket for
 					// the device lock
 
-	mlist_t tickets; //linked list of tickets
-	mlist_t *first_ticket; //points to first-served ticket in queue
+	ticketList_t tickets; //linked list of tickets
+	ticketList_t *first_ticket; //points to first-served ticket in queue
 
 	wait_queue_head_t blockq;       // Wait queue for tasks blocked on
 					// the device lock
@@ -491,8 +491,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		osp_spin_lock(&d->mutex);
 		//add pid to end of ticket list
-		mlist_t* tmp;
-		addToTicketList(d->ticket_tail, d->tickets, d->first_ticket);
+		addToTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
 		
 		osp_spin_unlock(&d->mutex);
 
@@ -502,7 +501,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		if (filp_writable) // opened for writing
 		{
-			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->num_read_locks == 0 && current->pid == d->first_ticket->pid);
+			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->num_read_locks == 0 && d->ticket_tail == d->first_ticket->ticketNum);
 
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
@@ -533,7 +532,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		else // opened for reading
 		{
 
-			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && current->pid == d->first_ticket->pid);
+			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->ticket_tail == d->first_ticket->ticketNum);
 
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
