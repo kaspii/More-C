@@ -93,7 +93,7 @@ int isPidInList(pid_t pid, mlist_t l)
 }
 
 /* Check whether the ticket already exists in the ticket list */
-int isTicketInList(int ticket, mlist_t l)
+int isTicketInList(int ticket, ticketList_t l)
 {
 	struct list_head *pos, *q;
 	ticketList_t *tmp;
@@ -111,7 +111,7 @@ int isTicketInList(int ticket, mlist_t l)
 	return 0;
 }
 
-/* Remove the pid from the list */
+/* Remove all items with the given pid from the list */
 int removeFromList(pid_t pid, mlist_t l)
 {
 	struct list_head *pos, *q;
