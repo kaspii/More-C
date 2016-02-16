@@ -502,7 +502,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// eprintk("Attempting to acquire\n");
 		// r = -ENOTTY;
 
-		// Deadlock cases
+		/* DEADLOCK CASES */
 		// If the current process already has the write lock, it cannot
 		// request another lock
 		osp_spin_lock(&d->mutex);
@@ -515,6 +515,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		//add pid to end of ticket list
 		int success = addToTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
 
+		//if adding pid unsuccessful, return error
 		if(!success)
 		{
 			return -ENOMEM;
@@ -526,18 +527,18 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		if (filp_writable) // opened for writing
 		{
-			// If the current process already has a read lock, it cannot
-			// request a write lock
+			// DEADLOCK: If current process has read lock, it can't request write lock
 			osp_spin_lock(&d->mutex);
 			if (isPidInList(current->pid, d->read_lock_pids))
 			{
-				// Deadlock: we don't want to service this ticket anymore
+				// Remove ticket from list to avoid deadlock
 				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -EDEADLK;
 			}
 			osp_spin_unlock(&d->mutex);
 
+			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->num_read_locks == 0 && local_ticket == d->first_ticket->ticketNum);
 
 			// If the lock request blocks and is awoken by a signal, then
@@ -555,6 +556,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->write_locked = 1;
 			d->write_lock_pid = current->pid;
 
+			// Ticket was serviced so remove it from list 
 			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 
 			// Mark file as locked
@@ -565,7 +567,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else // opened for reading
 		{
-
+			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && local_ticket == d->first_ticket->ticketNum);
 
 			// If the lock request blocks and is awoken by a signal, then
@@ -580,7 +582,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			osp_spin_lock(&d->mutex);
 			
-			// This file now has another read lock
+			// Add new read lock to this file's list
 			int success = addToList(current->pid, d->read_lock_pids);
 			// If we are not able to allocate memory for this reader, return
 			if(!success)
@@ -589,6 +591,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 			d->num_read_locks++;
 			
+			// Ticket was serviced so remove it from list
 			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
 
 			// Mark file as locked
@@ -617,7 +620,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// eprintk("Attempting to try acquire\n");
 		// r = -ENOTTY;
 
-		// Deadlock cases
+		/* DEADLOCK CASES */
 		// If the current process already has the write lock, it cannot
 		// request another lock
 		osp_spin_lock(&d->mutex);
@@ -632,6 +635,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if (filp_writable) // opened for writing
 		{
 			osp_spin_lock(&d->mutex);
+
+			// Grant write lock if no other locks exist on file
 			if (d->write_locked == 0 && d->num_read_locks == 0)
 			{
 				// The file is now write locked by the current process
@@ -653,9 +658,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			if (d->write_locked == 0)
 			{
-				// This file now has another read lock
-
+				// Add new read lock to file's list
 				int success = addToList(current->pid, d->read_lock_pids);
+
 				// If we are not able to allocate memory for the reader, return.
 				if(!success)
 				{
@@ -703,6 +708,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			if (filp_writable)	// opened for writing
 			{
+				// Remove write lock if in correct process
 				if (current->pid == d->write_lock_pid)
 				{
 					d->write_locked = 0;
@@ -730,6 +736,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				else if (count == 0)
 				{
 					osp_spin_unlock(&d->mutex);
+
+					// Return error if it wasn't possible to remove the read lock
 					return -EINVAL;
 				}
 				
