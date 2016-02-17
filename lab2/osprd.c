@@ -60,7 +60,7 @@ typedef struct ticketList
 
 /* Add the pid to the end of the list */
 /* Returns 0 if the add failed, 1 if it succeeded */
-int addToList(pid_t pid, mlist_t l)
+int addToList(pid_t pid, mlist_t* l)
 {
 	mlist_t *tmp;
 	tmp = (mlist_t *)kmalloc(sizeof(mlist_t), __GFP_NORETRY);
@@ -69,7 +69,7 @@ int addToList(pid_t pid, mlist_t l)
 		return 0;
 
 	tmp->pid = pid;
-	list_add_tail(&(tmp->list), &(l.list));
+	list_add_tail(&(tmp->list), &l->list);
 	return 1;
 }
 
@@ -112,13 +112,13 @@ int isTicketInList(int ticket, ticketList_t l)
 }
 
 /* Remove all items with the given pid from the list */
-int removeFromList(pid_t pid, mlist_t l)
+int removeFromList(pid_t pid, mlist_t* l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
 	int count = 0;
 
-	list_for_each_safe(pos, q, &l.list)
+	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, mlist_t, list);
 
@@ -134,13 +134,13 @@ int removeFromList(pid_t pid, mlist_t l)
 
 /* Remove one pid from the list and return the number of
 readers found with that pid */
-int removeOneFromList(pid_t pid, mlist_t l)
+int removeOneFromList(pid_t pid, mlist_t* l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
 	int found = 0;
 
-	list_for_each_safe(pos, q, &l.list)
+	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, mlist_t, list);
 
@@ -157,7 +157,7 @@ int removeOneFromList(pid_t pid, mlist_t l)
 	return found;
 }
 
-int addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
+int addToTicketList(int ticket, ticketList_t *l, ticketList_t **first)
 {
 	ticketList_t *tmp;
 	tmp = (ticketList_t *)kmalloc(sizeof(ticketList_t), __GFP_NORETRY);
@@ -168,16 +168,16 @@ int addToTicketList(int ticket, ticketList_t *l, ticketList_t *first)
 	tmp->ticketNum = ticket;
 	list_add_tail(&(tmp->list), &(l->list));
 	
-	if(first == NULL)
+	if(*first == NULL)
 	{
-		first = tmp;
+		*first = tmp;
 	}
 
 	return 1;
 }
 
 
-ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t *first)
+ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t **first)
 {
 	ticketList_t* tmp;
 	struct list_head *pos, *q;
@@ -190,7 +190,7 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t *fi
 
 		if(tmp->ticketNum == ticket)
 		{
-			if(tmp == first)
+			if(tmp == *first)
 			{
 				isFirstTicket = 1;
 			}
@@ -201,7 +201,7 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t *fi
 
 			if(list_empty(&l->list))
 			{
-				first = NULL;
+				*first = NULL;
 				return tmp;
 			}
 			break;
@@ -219,7 +219,7 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t *fi
 			nextNode = list_entry(pos, ticketList_t, list);
 			if(&nextNode->list == next)
 			{
-				first = nextNode;
+				*first = nextNode;
 				break;
 			} 
 		}
@@ -228,12 +228,12 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t *fi
 }
 
 /* Delete the list and deallocate */
-void deleteList(mlist_t l)
+void deleteList(mlist_t* l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
 
-	list_for_each_safe(pos, q, &l.list)
+	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, mlist_t, list);
 		list_del(pos);
@@ -358,7 +358,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
  		end_request(req, 0);
  	}
 
-	eprintk("Should process request...\n");
+	//eprintk("Should process request...\n");
 
 	end_request(req, 1);
 }
@@ -412,7 +412,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			else // opened for reading
 			{
 				// Delete all of the current process' locks
-				int numLocks = removeFromList(current->pid, d->read_lock_pids);
+				int numLocks = removeFromList(current->pid, &d->read_lock_pids);
 				d->num_read_locks -= numLocks;
 
 				// If we were able to remove a lock, clear the file of the locked flag
@@ -520,7 +520,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 		//add pid to end of ticket list
-		int success = addToTicketList(d->ticket_tail, &d->tickets, d->first_ticket);
+		int success = addToTicketList(d->ticket_tail, &d->tickets, &d->first_ticket);
 
 		//if adding pid unsuccessful, return error
 		if(!success)
@@ -539,7 +539,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (isPidInList(current->pid, d->read_lock_pids))
 			{
 				// Remove ticket from list to avoid deadlock
-				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
+				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -EDEADLK;
 			}
@@ -553,7 +553,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
+				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -564,7 +564,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->write_lock_pid = current->pid;
 
 			// Ticket was serviced so remove it from list 
-			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
+			removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -582,7 +582,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (wait_signal == -ERESTARTSYS)
 			{
 				osp_spin_lock(&d->mutex);
-				removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
+				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
@@ -590,7 +590,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			
 			// Add new read lock to this file's list
-			int success = addToList(current->pid, d->read_lock_pids);
+			int success = addToList(current->pid, &d->read_lock_pids);
 			// If we are not able to allocate memory for this reader, return
 			if(!success)
 			{
@@ -599,7 +599,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->num_read_locks++;
 			
 			// Ticket was serviced so remove it from list
-			removeFromTicketList(local_ticket, &d->tickets, d->first_ticket);
+			removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 
 			// Mark file as locked
 			filp->f_flags |= F_OSPRD_LOCKED;
@@ -666,7 +666,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if (d->write_locked == 0)
 			{
 				// Add new read lock to file's list
-				int success = addToList(current->pid, d->read_lock_pids);
+				int success = addToList(current->pid, &d->read_lock_pids);
 
 				// If we are not able to allocate memory for the reader, return.
 				if(!success)
@@ -733,7 +733,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			else	// opened for reading
 			{
 				// Delete this pid from read lock list
-				int count = removeOneFromList(current->pid, d->read_lock_pids);
+				int count = removeOneFromList(current->pid, &d->read_lock_pids);
 
 				if (count == 1)
 				{
