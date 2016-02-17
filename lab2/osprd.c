@@ -198,6 +198,7 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t **f
 			next = pos->next;
 			list_del(pos);
 			kfree(tmp);
+			eprintk("successful deletion\n");
 
 			if(list_empty(&l->list))
 			{
@@ -344,11 +345,13 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 
 	if (requestType == READ)
 	{
+		eprintk("request read\n");
 		// Copy data from our data array to the request's buffer
  		memcpy((void*)req->buffer, (void*)data_ptr, num_bytes);
 	}
  	else if (requestType == WRITE)
  	{
+ 		eprintk("request write\n");
  		// Copy data from the request's buffer to our data array
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
  	}
@@ -400,6 +403,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			{
 				if (current->pid == d->write_lock_pid)
 				{
+					eprintk("remove write lock\n");
 					// Remove the write lock
 					d->write_locked = 0;
 					// Reset the pid to -1 (no process has the write lock)
@@ -411,6 +415,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			}
 			else // opened for reading
 			{
+				eprintk("remove read lock\n");
 				// Delete all of the current process' locks
 				int numLocks = removeFromList(current->pid, &d->read_lock_pids);
 				d->num_read_locks -= numLocks;
@@ -515,6 +520,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		if (current->pid == d->write_lock_pid)
 		{
+			eprintk("deadlock\n");
 			osp_spin_unlock(&d->mutex);
 			return -EDEADLK;
 		}
@@ -534,11 +540,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		if (filp_writable) // opened for writing
 		{
+			eprintk("acquire write lock\n");
 			// DEADLOCK: If current process has read lock, it can't request write lock
 			osp_spin_lock(&d->mutex);
 			if (isPidInList(current->pid, d->read_lock_pids))
 			{
 				// Remove ticket from list to avoid deadlock
+				eprintk("deadlock\n");
 				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -EDEADLK;
@@ -547,17 +555,19 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && d->num_read_locks == 0 && local_ticket == d->first_ticket->ticketNum);
-
+			eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
 			if (wait_signal == -ERESTARTSYS)
 			{
+				eprintk("signal interrupted wait\n");
 				osp_spin_lock(&d->mutex);
 				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
 
+			eprintk("no issues - grant the write lock\n");
 			osp_spin_lock(&d->mutex);
 			// The file is now write locked by the current process
 			d->write_locked = 1;
@@ -574,19 +584,21 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else // opened for reading
 		{
+			eprintk("acquire read lock\n");
 			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 && local_ticket == d->first_ticket->ticketNum);
-
+			eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
 			if (wait_signal == -ERESTARTSYS)
 			{
+				eprintk("signal interrupted wait\n");
 				osp_spin_lock(&d->mutex);
 				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
-
+			eprintk("no issues - grant the read lock\n");
 			osp_spin_lock(&d->mutex);
 			
 			// Add new read lock to this file's list
