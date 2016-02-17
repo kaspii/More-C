@@ -166,6 +166,27 @@ close FOO;
       ') 2>/dev/null',
       "aX"
     ],
+
+    # 18
+    [
+      # Locking the same ramdisk twice would cause deadlock!
+      'echo foo | ./osprdaccess -w -l /dev/osprda /dev/osprda' ,
+      "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
+    ],
+
+    # 19
+    [
+      # Locking the same ramdisk twice would cause deadlock!
+      'echo foo | ./osprdaccess -w -l /dev/osprda -r /dev/osprda' ,
+      "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
+    ],
+
+    # 20
+    [
+      # Locking the same ramdisk twice would cause deadlock!
+      'echo foo | ./osprdaccess -w -r /dev/osprda -l /dev/osprda' ,
+      "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
+    ],
     );
 
 my($ntest) = 0;
