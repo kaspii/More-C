@@ -643,7 +643,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// If the current process already has the write lock, it cannot
 		// request another lock
 		osp_spin_lock(&d->mutex);
-		if (d->first_ticket->ticketNum != d->ticket_tail)
+		if (d->first_ticket != NULL)
 		{
 			osp_spin_unlock(&d->mutex);
 			return -EBUSY;
