@@ -74,12 +74,12 @@ int addToList(pid_t pid, mlist_t* l)
 }
 
 /* Check whether the pid already exists in the reader list */
-int isPidInList(pid_t pid, mlist_t l)
+int isPidInList(pid_t pid, mlist_t* l)
 {
 	struct list_head *pos, *q;
 	mlist_t *tmp;
 
-	list_for_each_safe(pos, q, &l.list)
+	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, mlist_t, list);
 
@@ -93,12 +93,12 @@ int isPidInList(pid_t pid, mlist_t l)
 }
 
 /* Check whether the ticket already exists in the ticket list */
-int isTicketInList(int ticket, ticketList_t l)
+int isTicketInList(int ticket, ticketList_t* l)
 {
 	struct list_head *pos, *q;
 	ticketList_t *tmp;
 
-	list_for_each_safe(pos, q, &l.list)
+	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, ticketList_t, list);
 
@@ -543,7 +543,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			eprintk("acquire write lock\n");
 			// DEADLOCK: If current process has read lock, it can't request write lock
 			osp_spin_lock(&d->mutex);
-			if (isPidInList(current->pid, d->read_lock_pids))
+			if (isPidInList(current->pid, &d->read_lock_pids))
 			{
 				// Remove ticket from list to avoid deadlock
 				eprintk("deadlock\n");
