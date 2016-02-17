@@ -184,7 +184,7 @@ close FOO;
     # 20
     [
       # Locking the same ramdisk twice would cause deadlock!
-      'echo foo | ./osprdaccess -w -r /dev/osprda -l /dev/osprda' ,
+      'echo foo | ./osprdaccess -r -l /dev/osprda -w /dev/osprda' ,
       "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
     ],
     );
