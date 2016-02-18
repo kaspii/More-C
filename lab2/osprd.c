@@ -52,12 +52,25 @@ typedef struct mList
 	int isFirstTicket;
 } mlist_t;
 
+/* Request list implementation */
+typedef struct reqList
+{
+	struct list_head list;
+	pid_t pid;
+	unsigned is_modified;
+	sector_t sector_num;
+	unsigned num_sectors;
+} reqList_t;
+
 typedef struct ticketList
 {
 	struct list_head list;
 	int ticketNum;
 } ticketList_t;
 
+/************************************************************/
+/*==================== PID READER LIST =====================*/
+/************************************************************/
 /* Add the pid to the end of the list */
 /* Returns 0 if the add failed, 1 if it succeeded */
 int addToList(pid_t pid, mlist_t* l)
@@ -84,25 +97,6 @@ int isPidInList(pid_t pid, mlist_t* l)
 		tmp = list_entry(pos, mlist_t, list);
 
 		if(tmp->pid == pid)
-		{
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-/* Check whether the ticket already exists in the ticket list */
-int isTicketInList(int ticket, ticketList_t* l)
-{
-	struct list_head *pos, *q;
-	ticketList_t *tmp;
-
-	list_for_each_safe(pos, q, &l->list)
-	{
-		tmp = list_entry(pos, ticketList_t, list);
-
-		if(tmp->ticketNum == ticket)
 		{
 			return 1;
 		}
@@ -155,6 +149,43 @@ int removeOneFromList(pid_t pid, mlist_t* l)
 		}
 	}
 	return found;
+}
+
+/* Delete the list and deallocate */
+void deleteList(mlist_t* l)
+{
+	struct list_head *pos, *q;
+	mlist_t *tmp;
+
+	list_for_each_safe(pos, q, &l->list)
+	{
+		tmp = list_entry(pos, mlist_t, list);
+		list_del(pos);
+		kfree(tmp);
+	}
+}
+
+
+/************************************************************/
+/*==================== TICKET LIST =========================*/
+/************************************************************/
+/* Check whether the ticket already exists in the ticket list */
+int isTicketInList(int ticket, ticketList_t* l)
+{
+	struct list_head *pos, *q;
+	ticketList_t *tmp;
+
+	list_for_each_safe(pos, q, &l->list)
+	{
+		tmp = list_entry(pos, ticketList_t, list);
+
+		if(tmp->ticketNum == ticket)
+		{
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 int addToTicketList(int ticket, ticketList_t *l, ticketList_t **first)
@@ -228,21 +259,77 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t **f
 	return tmp;	
 }
 
-/* Delete the list and deallocate */
-void deleteList(mlist_t* l)
+
+
+/************************************************************/
+/*=============== NOTIFICATION REQUEST LIST ================*/
+/************************************************************/
+
+/* Add a request to the list of requests for this ramdisk */
+int addToRequestList(pid_t pid, reqList_t* l, sector_t sector = 0, unsigned num = nsectors)
+{
+	reqList_t *tmp;
+	tmp = (reqList_t *)kmalloc(sizeof(reqList_t), __GFP_NORETRY);
+
+	if(tmp == NULL)
+		return 0;
+
+	tmp->pid = pid;
+	tmp->sector_num = sector;
+	tmp->num_sectors = num;
+	tmp->is_modified = 0;
+
+	list_add_tail(&(tmp->list), &l->list);
+	return 1;
+}
+
+/* Remove all items with the given pid from the request list */
+int removeFromRequestList(pid_t pid, reqList_t* l)
 {
 	struct list_head *pos, *q;
-	mlist_t *tmp;
+	reqList_t *tmp;
+	int count = 0;
 
 	list_for_each_safe(pos, q, &l->list)
 	{
-		tmp = list_entry(pos, mlist_t, list);
-		list_del(pos);
-		kfree(tmp);
+		tmp = list_entry(pos, reqList_t, list);
+
+		if(tmp->pid == pid)
+		{
+			list_del(pos);
+			kfree(tmp);
+			count++;
+		}
 	}
+	return count;
+}
+
+/* Check whether the pid already exists in the request list */
+int isRequestInList(pid_t pid, reqList_t* l)
+{
+	struct list_head *pos, *q;
+	reqList_t *tmp;
+
+	int count = 0;
+
+	list_for_each_safe(pos, q, &l->list)
+	{
+		tmp = list_entry(pos, reqList_t, list);
+
+		if(tmp->pid == pid)
+		{
+			count++;
+		}
+	}
+
+	return count;
 }
 
 
+
+/************************************************************/
+/*==================== OSPRD INFO ==========================*/
+/************************************************************/
 /* The internal representation of our device. */
 typedef struct osprd_info {
 	uint8_t *data;                          // The data array. Its size is
@@ -262,7 +349,7 @@ typedef struct osprd_info {
 	wait_queue_head_t blockq;       		// Wait queue for tasks blocked on the device lock
 
 	/**************************NOTIFICATION LIST******************************/
-	mlist_t notify_pids;					// linked list of processes that want to be notified
+	reqList_t notify_pids;					// linked list of processes that want to be notified
 	                                        // when there is a write to this ramdisk
 
 	/**************************DEADLOCK***************************************/
