@@ -266,8 +266,15 @@ ticketList_t *removeFromTicketList(int ticket, ticketList_t *l, ticketList_t **f
 /************************************************************/
 
 /* Add a request to the list of requests for this ramdisk */
-int addToRequestList(pid_t pid, reqList_t* l, sector_t sector = 0, unsigned num = nsectors)
+int addToRequestList(pid_t pid, reqList_t* l, sector_t sector, unsigned num)
 {
+	// If the sector number and range are not specified, assume the request
+	// refers to the entire ramdisk
+	if (sector = -1)
+		sector = 0;
+	if (num = -1)
+		num = nsectors;
+
 	reqList_t *tmp;
 	tmp = (reqList_t *)kmalloc(sizeof(reqList_t), __GFP_NORETRY);
 
@@ -403,8 +410,18 @@ static void for_each_open_file(struct task_struct *task,
  *   Called when the user reads or writes a sector.
  *   Should perform the read or write, as appropriate.
  */
-static void osprd_process_request(osprd_info_t *d, struct request *req)
+static void osprd_process_request(osprd_info_t *d, struct request *req, reqList_t* notif = NULL)
 {
+	if (notif)
+	{
+		int success = addToRequestList(current->pid, notify_pids, notif->sector_num, notif->num_sectors);
+		if (!success)
+		{
+			return -ENOMEM;
+		}
+		return;
+	}
+
 	if (!blk_fs_request(req)) {
 		end_request(req, 0);
 		return;
@@ -881,6 +898,8 @@ static void osprd_setup(osprd_info_t *d)
 	INIT_LIST_HEAD(&(d->read_lock_pids.list));
 	// Initialize ticket list
 	INIT_LIST_HEAD(&(d->tickets.list));
+	// Initialize notification list
+	INIT_LIST_HEAD(&(d->notify_pids.list));
 
 	/* Add code here if you add fields to osprd_info_t. */
 	d->num_read_locks = 0;
