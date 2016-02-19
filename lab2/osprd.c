@@ -363,6 +363,25 @@ void notify_followers(reqList_t* followers, sector_t sector, size_t num_bytes)
 	}
 }
 
+//Checks whether the ramdisk has been modified for a particular request
+int ramdiskModified(pid_t pid, reqList_t* l)
+{
+	struct list_head *pos, *q;
+	reqList_t *tmp;
+
+	int all_modified = 1;
+
+	list_for_each_safe(pos, q, &l->list)
+	{
+		tmp = list_entry(pos, reqList_t, list);
+
+		if(tmp->pid == pid)
+			all_modified &= tmp->is_modified;
+	}
+
+	return all_modified;
+}
+
 /************************************************************/
 /*==================== OSPRD INFO ==========================*/
 /************************************************************/
