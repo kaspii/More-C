@@ -363,13 +363,16 @@ void notify_followers(reqList_t* followers, sector_t sector, size_t num_bytes)
 	}
 }
 
-//Checks whether the ramdisk has been modified for a particular request
 //Determines whether the request has been satisfied and can stop blocking
+//Returns true if:
+	//no requests have this PID (can immediately stop blocking)
+	//all requests with the PID are satisified
 int ramdiskModified(pid_t pid, reqList_t* l)
 {
 	struct list_head *pos, *q;
 	reqList_t *tmp;
 
+	int count = 0;
 	int all_modified = 1;
 
 	list_for_each_safe(pos, q, &l->list)
@@ -377,9 +380,14 @@ int ramdiskModified(pid_t pid, reqList_t* l)
 		tmp = list_entry(pos, reqList_t, list);
 
 		if(tmp->pid == pid)
+		{
 			all_modified &= tmp->is_modified;
+			count++;
+		}
 	}
 
+	if(!count)
+		return 1;
 	return all_modified;
 }
 
