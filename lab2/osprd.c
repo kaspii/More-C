@@ -332,7 +332,36 @@ int isRequestInList(pid_t pid, reqList_t* l)
 	return count;
 }
 
+// Notify all processes following this ramdisk by updating their is_modified variable
+void notify_followers(reqList_t* followers, sector_t sector, size_t num_bytes)
+{
+	struct list_head *pos, *q;
+	reqList_t *tmp;
+	unsigned num_sectors = num_bytes/SECTOR_SIZE;
 
+	// avoid truncation
+	if (num_sectors * SECTOR_SIZE < num_bytes)
+	{
+		num_sectors++;
+	}
+
+	unsigned write_end = sector + num_sectors;
+
+	list_for_each_safe(pos, q, &l->list)
+	{
+		tmp = list_entry(pos, reqList_t, list);
+		unsigned request_end = tmp->sector_num + tmp->num_sectors;
+
+		// If the actual write overlaps with the requested sectors
+		// notify the process that the sector region they were following
+		// has been modified by a write
+		if ((tmp->sector_num <= sector && request_end >= sector) 
+			|| (tmp->sector_num <= write_end && request_end >= write_end))
+		{
+			tmp->is_modified = 1;
+		}
+	}
+}
 
 /************************************************************/
 /*==================== OSPRD INFO ==========================*/
@@ -383,6 +412,7 @@ typedef struct osprd_info {
 #define NOSPRD 4
 static osprd_info_t osprds[NOSPRD];
 // Declare useful helper functions
+
 
 /*
  * file2osprd(filp)
@@ -461,6 +491,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req, reqList_
  		//eprintk("request write\n");
  		// Copy data from the request's buffer to our data array
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
+ 		notify_followers(d->notify_pids, req->sector, num_bytes);
  	}
  	else
  	{
