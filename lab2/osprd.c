@@ -364,6 +364,7 @@ void notify_followers(reqList_t* followers, sector_t sector, size_t num_bytes)
 }
 
 //Checks whether the ramdisk has been modified for a particular request
+//Determines whether the request has been satisfied and can stop blocking
 int ramdiskModified(pid_t pid, reqList_t* l)
 {
 	struct list_head *pos, *q;
