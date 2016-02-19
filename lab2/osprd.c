@@ -468,18 +468,19 @@ static void for_each_open_file(struct task_struct *task,
  *   Called when the user reads or writes a sector.
  *   Should perform the read or write, as appropriate.
  */
-static void osprd_process_request(osprd_info_t *d, struct request *req, reqList_t* notif = NULL)
-{
-	if (notif)
-	{
-		int success = addToRequestList(current->pid, notify_pids, notif->sector_num, notif->num_sectors);
-		if (!success)
-		{
-			return -ENOMEM;
-		}
-		return;
-	}
 
+static void osprd_notification_request(osprd_info_t* d, reqList_t* notif)
+{
+	int success = addToRequestList(current->pid, notify_pids, notif->sector_num, notif->num_sectors);
+	if (!success)
+	{
+		return -ENOMEM;
+	}
+	return;
+}
+
+static void osprd_process_request(osprd_info_t *d, struct request *req)
+{
 	if (!blk_fs_request(req)) {
 		end_request(req, 0);
 		return;
