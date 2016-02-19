@@ -723,7 +723,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 
 														&& d->num_read_locks == 0 
 														&& local_ticket == d->first_ticket->ticketNum 
-														&& ramdiskModified());
+														&& ramdiskModified(current->pid, &d->notify_pids));
 			//eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
@@ -757,7 +757,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 
 														&& local_ticket == d->first_ticket->ticketNum 
-														&& ramdiskModified());
+														&& ramdiskModified(current->pid, &d->notify_pids));
 			//eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
