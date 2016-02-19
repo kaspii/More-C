@@ -333,7 +333,7 @@ int isRequestInList(pid_t pid, reqList_t* l)
 }
 
 // Notify all processes following this ramdisk by updating their is_modified variable
-void notify_followers(reqList_t* followers, sector_t sector, size_t num_bytes)
+void notify_followers(reqList_t* l, sector_t sector, size_t num_bytes)
 {
 	struct list_head *pos, *q;
 	reqList_t *tmp;
@@ -469,14 +469,14 @@ static void for_each_open_file(struct task_struct *task,
  *   Should perform the read or write, as appropriate.
  */
 
-static void osprd_notification_request(osprd_info_t* d, reqList_t* notif)
+static int osprd_notification_request(osprd_info_t* d, reqList_t* notif)
 {
-	int success = addToRequestList(current->pid, notify_pids, notif->sector_num, notif->num_sectors);
+	int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
 	if (!success)
 	{
 		return -ENOMEM;
 	}
-	return;
+	return 0;
 }
 
 static void osprd_process_request(osprd_info_t *d, struct request *req)
@@ -520,7 +520,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
  		//eprintk("request write\n");
  		// Copy data from the request's buffer to our data array
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
- 		notify_followers(d->notify_pids, req->sector, num_bytes);
+ 		notify_followers(&d->notify_pids, req->sector, num_bytes);
  	}
  	else
  	{
