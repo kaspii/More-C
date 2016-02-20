@@ -243,6 +243,7 @@ int main(int argc, char *argv[])
 			sleep_for(lock_delay);
 		if (dolock
 		    && ioctl(devfd, OSPRDIOCACQUIRE, NULL) == -1) {
+			fprintf(stdout, "ACQUIRE failing\n");
 			perror("ioctl OSPRDIOCACQUIRE");
 			exit(1);
 		} else if (dotrylock

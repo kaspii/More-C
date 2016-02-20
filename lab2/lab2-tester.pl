@@ -191,8 +191,9 @@ close FOO;
     #21
     [
       '(./osprdaccess -n 0 32) && ' .
-      '(echo foo | ./osprdaccess -w -l /dev/osprda -r /dev/osprda)' ,
-      "Notification request worked"
+      '(echo a | ./osprdaccess -w 1) && ' .
+      '(./osprdaccess -r 16)',
+      "a"
     ],
 
     );

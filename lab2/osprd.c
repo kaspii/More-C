@@ -680,7 +680,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		if (current->pid == d->write_lock_pid)
 		{
-			//eprintk("deadlock\n");
+			eprintk("deadlock\n");
 			osp_spin_unlock(&d->mutex);
 			return -EDEADLK;
 		}
@@ -943,7 +943,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// 	return -ENOMEM;
 		// }
 
-		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
+/*		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
 
 		osp_spin_lock(&d->mutex);
 		removeFromRequestList(current->pid, &d->notify_pids);
@@ -952,7 +952,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if (wait_signal == -ERESTARTSYS)
 		{
 			return -ERESTARTSYS;
-		}
+		}*/
 
 		r = 0;
 	} 
