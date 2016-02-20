@@ -175,6 +175,8 @@ int main(int argc, char *argv[])
 			perror("Error requesting memory change notification");
 			exit(1);
 		}
+		
+		goto flag;
 	}
 
 	// Detect an offset

@@ -614,6 +614,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 int osprd_ioctl(struct inode *inode, struct file *filp,
 		unsigned int cmd, reqParams_t *reqParams)
 {
+	eprintk("IOCTL IS ACTUALLY BEING CALLED YAY\n");
 	osprd_info_t *d = file2osprd(filp);	// device info
 	int r = 0;			// return value: initially 0
 
@@ -956,8 +957,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		r = 0;
 	} 
 	else
+	{
 		eprintk("Ioctl is being knotty\n");
 		r = -ENOTTY; /* unknown command */
+	}
 	return r;
 }
 
