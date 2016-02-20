@@ -138,7 +138,9 @@ int main(int argc, char *argv[])
 	double delay = 0;
 	double lock_delay = 0;
 	const char *devname = "/dev/osprda";
-
+	
+	int notif;
+	reqParams_t params;
 	int x = 1;
 	int *ptr = &x;
 
@@ -164,17 +166,13 @@ int main(int argc, char *argv[])
 		unsigned long s = strtol(argv[2], &bob, 10);
 		unsigned n = strtol(argv[3], &bob, 10);
 
-		reqParams_t params;
 		params.sector = s;
 		params.nSectors = n;
 
 		argv += 3;
 		argc -= 3;
 
-		if (ioctl(devfd, OSPRDIONOTIFY, &params) == -1) {
-			perror("Error requesting memory change notification");
-			exit(1);
-		}
+		notif = 1;
 		
 		goto flag;
 	}
@@ -240,7 +238,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Lock, possibly after delay
-	if (dolock || dotrylock) {
+	if (dolock || dotrylock || notif) {
 		if (lock_delay >= 0)
 			sleep_for(lock_delay);
 		if (dolock
@@ -251,7 +249,11 @@ int main(int argc, char *argv[])
 			   && ioctl(devfd, OSPRDIOCTRYACQUIRE, NULL) == -1) {
 			perror("ioctl OSPRDIOCTRYACQUIRE");
 			exit(1);
-		}
+		} else if (notif && ioctl(devfd, OSPRDIONOTIFY, &params) == -1) {
+                        perror("Error requesting memory change notification");
+                        exit(1);
+                }
+
 	}
 
 	// Delay
