@@ -469,16 +469,6 @@ static void for_each_open_file(struct task_struct *task,
  *   Should perform the read or write, as appropriate.
  */
 
-static int osprd_notification_request(osprd_info_t* d, reqList_t* notif)
-{
-	int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
-	if (!success)
-	{
-		return -ENOMEM;
-	}
-	return 0;
-}
-
 static void osprd_process_request(osprd_info_t *d, struct request *req)
 {
 	if (!blk_fs_request(req)) {
@@ -723,8 +713,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 
 														&& d->num_read_locks == 0 
-														&& local_ticket == d->first_ticket->ticketNum 
-														&& ramdiskModified(current->pid, &d->notify_pids));
+														&& local_ticket == d->first_ticket->ticketNum);
 			//eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
@@ -757,8 +746,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			//eprintk("acquire read lock\n");
 			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 
-														&& local_ticket == d->first_ticket->ticketNum 
-														&& ramdiskModified(current->pid, &d->notify_pids));
+														&& local_ticket == d->first_ticket->ticketNum);
 			//eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
@@ -943,7 +931,28 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			r = 0;
 		}
 
-	} else
+	} else if (cmd == OSPRDIONOTIFY) {
+
+		int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
+		if (!success)
+		{
+			return -ENOMEM;
+		}
+
+		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
+
+		osp_spin_lock(&d->mutex);
+		removeFromRequestList(current->pid, &d->notify_pids);
+		osp_spin_unlock(&d->mutex);
+
+		if (wait_signal == -ERESTARTSYS)
+		{
+			return -ERESTARTSYS;
+		}
+
+		r = 0;
+	} 
+	else
 		r = -ENOTTY; /* unknown command */
 	return r;
 }
