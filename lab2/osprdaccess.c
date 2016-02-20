@@ -161,8 +161,8 @@ int main(int argc, char *argv[])
 	// Detect a memory change request
 	if (argc >= 2 && strcmp(argv[1], "-n") == 0) {
 		char *bob;
-		unsigned long s = strtol(argv[2], bob, 10);
-		unsigned n = strtol(argv[3], bob, 10);
+		unsigned long s = strtol(argv[2], &bob, 10);
+		unsigned n = strtol(argv[3], &bob, 10);
 
 		reqParams_t params;
 		params.sector = s;
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 		argv += 3;
 		argc -= 3;
 
-		if (ioctl(devfd, OSPRDIOCACQUIRE, &params) == -1) {
+		if (ioctl(devfd, OSPRDIONOTIFY, &params) == -1) {
 			perror("Error requesting memory change notification");
 			exit(1);
 		}

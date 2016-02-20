@@ -270,9 +270,9 @@ int addToRequestList(pid_t pid, reqList_t* l, sector_t sector, unsigned num)
 {
 	// If the sector number and range are not specified, assume the request
 	// refers to the entire ramdisk
-	if (sector = -1)
+	if (sector == -1)
 		sector = 0;
-	if (num = -1)
+	if (num == -1)
 		num = nsectors;
 
 	reqList_t *tmp;
@@ -625,7 +625,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	unsigned int local_ticket = 0;
 
-	eprintk("Sector: %lu, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
+	//eprintk("Sector: %lu, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
 
 	if (d == NULL)
 		return -1;
@@ -670,7 +670,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// be protected by a spinlock; which ones?)
 
 		// Your code here (instead of the next two lines).
-		// eprintk("Attempting to acquire\n");
+		eprintk("Attempting to acquire\n");
 		// r = -ENOTTY;
 
 		/* DEADLOCK CASES */
@@ -699,13 +699,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 		if (filp_writable) // opened for writing
 		{
-			//eprintk("acquire write lock\n");
+			eprintk("acquire write lock\n");
 			// DEADLOCK: If current process has read lock, it can't request write lock
 			osp_spin_lock(&d->mutex);
 			if (isPidInList(current->pid, &d->read_lock_pids))
 			{
 				// Remove ticket from list to avoid deadlock
-				//eprintk("deadlock\n");
+				eprintk("deadlock\n");
 				removeFromTicketList(local_ticket, &d->tickets, &d->first_ticket);
 				osp_spin_unlock(&d->mutex);
 				return -EDEADLK;
@@ -716,7 +716,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 
 														&& d->num_read_locks == 0 
 														&& local_ticket == d->first_ticket->ticketNum);
-			//eprintk("done waiting\n");
+			eprintk("done waiting\n");
 			// If the lock request blocks and is awoken by a signal, then
 			// return -ERESTARTSYS.
 			if (wait_signal == -ERESTARTSYS)
@@ -745,7 +745,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else // opened for reading
 		{
-			//eprintk("acquire read lock\n");
+			eprintk("acquire read lock\n");
 			// Wait until local ticket can be serviced
 			int wait_signal = wait_event_interruptible(d->blockq, d->write_locked == 0 
 														&& local_ticket == d->first_ticket->ticketNum);
@@ -935,7 +935,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	} else if (cmd == OSPRDIONOTIFY) {
 
-		// int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
+		eprintk("Notify case reached\n");	
+	// int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
 		// if (!success)
 		// {
 		// 	return -ENOMEM;
@@ -955,6 +956,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		r = 0;
 	} 
 	else
+		eprintk("Ioctl is being knotty\n");
 		r = -ENOTTY; /* unknown command */
 	return r;
 }
