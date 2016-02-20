@@ -187,6 +187,14 @@ close FOO;
       'echo foo | ./osprdaccess -r -l /dev/osprda -w /dev/osprda' ,
       "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
     ],
+
+    #21
+    [
+      './osprdaccess -n 0 32' .
+      'echo foo | ./osprdaccess -w -l /dev/osprda -r /dev/osprda' ,
+      "Notification request worked"
+    ],
+
     );
 
 my($ntest) = 0;
