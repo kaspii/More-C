@@ -52,6 +52,12 @@ typedef struct mList
 	int isFirstTicket;
 } mlist_t;
 
+typedef struct ticketList
+{
+	struct list_head list;
+	int ticketNum;
+} ticketList_t;
+
 /* Request list implementation */
 typedef struct reqList
 {
@@ -61,12 +67,6 @@ typedef struct reqList
 	sector_t sector_num;
 	unsigned num_sectors;
 } reqList_t;
-
-typedef struct ticketList
-{
-	struct list_head list;
-	int ticketNum;
-} ticketList_t;
 
 /************************************************************/
 /*==================== PID READER LIST =====================*/
@@ -933,7 +933,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	} else if (cmd == OSPRDIONOTIFY) {
 
-		int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
+		// int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
 		if (!success)
 		{
 			return -ENOMEM;
