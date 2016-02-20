@@ -625,7 +625,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	unsigned int local_ticket = 0;
 
-	eprintk("Sector: %u, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
+	eprintk("Sector: %lu, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
 
 	if (d == NULL)
 		return -1;

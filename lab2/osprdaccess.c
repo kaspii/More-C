@@ -160,8 +160,9 @@ int main(int argc, char *argv[])
 
 	// Detect a memory change request
 	if (argc >= 2 && strcmp(argv[1], "-n") == 0) {
-		unsigned long s = argv[2];
-		unsigned n = argv[3];
+		char *bob;
+		unsigned long s = strtol(argv[2], bob, 10);
+		unsigned n = strtol(argv[3], bob, 10);
 
 		reqParams_t params;
 		params.sector = s;
