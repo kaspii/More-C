@@ -1,6 +1,6 @@
 #ifndef OSPRD_H
 #define OSPRD_H
-#include <linux/types.h>
+// #include <linux/types.h>
 
 // ioctl constants
 #define OSPRDIOCACQUIRE		42
@@ -10,7 +10,7 @@
 
 typedef struct reqParams
 {
-	sector_t sector;
+	unsigned long sector;
 	unsigned nSectors;
 } reqParams_t;
 

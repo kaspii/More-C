@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
 
 	// Detect a memory change request
 	if (argc >= 2 && strcmp(argv[1], "-n") == 0) {
-		sector_t s = argv[2];
+		unsigned long s = argv[2];
 		unsigned n = argv[3];
 
 		reqParams_t params;
