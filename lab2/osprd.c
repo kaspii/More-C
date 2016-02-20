@@ -612,7 +612,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
  *   Called to perform an ioctl on the named file.
  */
 int osprd_ioctl(struct inode *inode, struct file *filp,
-		unsigned int cmd, unsigned long arg)
+		unsigned int cmd, int test)
 {
 	osprd_info_t *d = file2osprd(filp);	// device info
 	int r = 0;			// return value: initially 0
