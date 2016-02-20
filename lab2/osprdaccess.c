@@ -10,6 +10,8 @@
 
 #include "osprd.h"
 
+
+
 void usage(int status)
 {
 	fprintf(stderr, "\
@@ -157,12 +159,21 @@ int main(int argc, char *argv[])
 	}
 
 	// Detect a memory change request
-	if (argc >= 2 && strcmp(argv[1], "-m") == 0) {
-		sector_t sector = argv[2];
-		unsigned nSectors = argv[3];
+	if (argc >= 2 && strcmp(argv[1], "-n") == 0) {
+		sector_t s = argv[2];
+		unsigned n = argv[3];
+
+		reqParams_t params;
+		params.sector = s;
+		params.nSectors = n;
+
 		argv += 3;
 		argc -= 3;
 
+		if (ioctl(devfd, OSPRDIOCACQUIRE, &params) == -1) {
+			perror("Error requesting memory change notification");
+			exit(1);
+		}
 	}
 
 	// Detect an offset
@@ -230,11 +241,11 @@ int main(int argc, char *argv[])
 		if (lock_delay >= 0)
 			sleep_for(lock_delay);
 		if (dolock
-		    && ioctl(devfd, OSPRDIOCACQUIRE, ptr) == -1) {
+		    && ioctl(devfd, OSPRDIOCACQUIRE, NULL) == -1) {
 			perror("ioctl OSPRDIOCACQUIRE");
 			exit(1);
 		} else if (dotrylock
-			   && ioctl(devfd, OSPRDIOCTRYACQUIRE, ptr) == -1) {
+			   && ioctl(devfd, OSPRDIOCTRYACQUIRE, NULL) == -1) {
 			perror("ioctl OSPRDIOCTRYACQUIRE");
 			exit(1);
 		}

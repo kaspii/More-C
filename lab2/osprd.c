@@ -612,7 +612,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
  *   Called to perform an ioctl on the named file.
  */
 int osprd_ioctl(struct inode *inode, struct file *filp,
-		unsigned int cmd, int test)
+		unsigned int cmd, reqParams_t *reqParams)
 {
 	osprd_info_t *d = file2osprd(filp);	// device info
 	int r = 0;			// return value: initially 0
@@ -624,6 +624,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	(void) filp_writable, (void) d;
 
 	unsigned int local_ticket = 0;
+
+	eprintk("Sector: %u, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
 
 	if (d == NULL)
 		return -1;
@@ -934,10 +936,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	} else if (cmd == OSPRDIONOTIFY) {
 
 		// int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
-		if (!success)
-		{
-			return -ENOMEM;
-		}
+		// if (!success)
+		// {
+		// 	return -ENOMEM;
+		// }
 
 		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
 
