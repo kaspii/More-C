@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 	double lock_delay = 0;
 	const char *devname = "/dev/osprda";
 	
-	int notif;
+	int notif = 0;
 	reqParams_t params;
 	int x = 1;
 	int *ptr = &x;

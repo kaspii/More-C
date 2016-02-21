@@ -626,8 +626,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 
 	unsigned int local_ticket = 0;
 
-	//eprintk("Sector: %lu, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
-
 	if (d == NULL)
 		return -1;
 
@@ -937,13 +935,15 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	} else if (cmd == OSPRDIONOTIFY) {
 
 		eprintk("Notify case reached\n");	
-	// int success = addToRequestList(current->pid, &d->notify_pids, notif->sector_num, notif->num_sectors);
-		// if (!success)
-		// {
-		// 	return -ENOMEM;
-		// }
+		eprintk("Sector: %lu, Num sectors: %u\n", reqParams->sector, reqParams->nSectors);
+		int success = addToRequestList(current->pid, &d->notify_pids, reqParams->sector, reqParams->nSectors);
+		if (!success)
+		{
+			return -ENOMEM;
+		}
+		eprintk("adding to request list succeeded\n");
 
-/*		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
+		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
 
 		osp_spin_lock(&d->mutex);
 		removeFromRequestList(current->pid, &d->notify_pids);
@@ -952,7 +952,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if (wait_signal == -ERESTARTSYS)
 		{
 			return -ERESTARTSYS;
-		}*/
+		}
 
 		r = 0;
 	} 
