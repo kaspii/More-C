@@ -196,9 +196,20 @@ close FOO;
       "foofoo"
     ],
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> b13af1e... compiling code for TA
+=======
+
+    # 22
+    [ '(./osprdaccess -n 0 32) & (sleep 2 && ' .
+      '(./osprdaccess -r 6 -l 1) &' .
+      '(echo foobar | ./osprdaccess -w -l)) ',
+      "foobar"
+    ],
+
+>>>>>>> fd0a8b8... Added test case for notification request
     );
 
 my($ntest) = 0;
