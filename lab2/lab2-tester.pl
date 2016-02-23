@@ -188,17 +188,9 @@ close FOO;
       "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
     ],
 
-    #21
-    [
-      '(./osprdaccess -n 0 32) && ' .
-      '(echo a | ./osprdaccess -w 3) && ' .
-      '(./osprdaccess -r 16)',
-      "a"
-    ],
-
-    # 22
+    # 21
     [ 
-      '(./osprdaccess -n 1 31) & (sleep 2 && ' .
+      '(./osprdaccess -n 0 32) & (sleep 2 && ' .
       '(echo foo | ./osprdaccess -w 3)) && sleep 3 && ' .
       '(./osprdaccess -r 3 && ./osprdaccess -r 3) && sleep 6 ',
       "foofoo"

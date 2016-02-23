@@ -358,7 +358,7 @@ void notify_followers(reqList_t* l, sector_t sector, size_t num_bytes)
 		// has been modified by a write
 		if ((tmp->sector_num <= sector && request_end >= sector) 
 			|| (tmp->sector_num <= write_end && request_end >= write_end))
-		{r
+		{
 			tmp->is_modified = 1;
 		}
 	}
@@ -621,7 +621,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	eprintk("IOCTL IS ACTUALLY BEING CALLED YAY\n");
 
 	osprd_info_t *d = file2osprd(filp);	// device info
-	int r = 0add;			// return value: initially 0
+	int r = 0;			// return value: initially 0
 
 	// is file open for writing?
 	int filp_writable = (filp->f_mode & FMODE_WRITE) != 0;
