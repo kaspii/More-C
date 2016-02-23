@@ -350,16 +350,17 @@ void notify_followers(reqList_t* l, sector_t sector, size_t num_bytes)
 	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, reqList_t, list);
-		unsigned request_end = tmp->sector_num + tmp->num_sectors;
+		tmp->is_modified = 1;
+		// unsigned request_end = tmp->sector_num + tmp->num_sectors;
 
-		// If the actual write overlaps with the requested sectors
-		// notify the process that the sector region they were following
-		// has been modified by a write
-		if ((tmp->sector_num <= sector && request_end >= sector) 
-			|| (tmp->sector_num <= write_end && request_end >= write_end))
-		{
-			tmp->is_modified = 1;
-		}
+		// // If the actual write overlaps with the requested sectors
+		// // notify the process that the sector region they were following
+		// // has been modified by a write
+		// if ((tmp->sector_num <= sector && request_end >= sector) 
+		// 	|| (tmp->sector_num <= write_end && request_end >= write_end))
+		// {r
+		// 	tmp->is_modified = 1;
+		// }
 	}
 }
 
@@ -411,6 +412,7 @@ typedef struct osprd_info {
 	ticketList_t *first_ticket; 			// points to first-served ticket in queue
 
 	wait_queue_head_t blockq;       		// Wait queue for tasks blocked on the device lock
+	wait_queue_head_t notifq;       		// Wait queue for tasks blocked on memory notification requests
 
 	/**************************NOTIFICATION LIST******************************/
 	reqList_t notify_pids;					// linked list of processes that want to be notified
@@ -511,6 +513,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
  		// Copy data from the request's buffer to our data array
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
  		notify_followers(&d->notify_pids, req->sector, num_bytes);
+ 		wake_up_all(&d->notifq);
  	}
  	else
  	{
@@ -615,6 +618,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		unsigned int cmd, reqParams_t *reqParams)
 {
 	eprintk("IOCTL IS ACTUALLY BEING CALLED YAY\n");
+
 	osprd_info_t *d = file2osprd(filp);	// device info
 	int r = 0;			// return value: initially 0
 
@@ -943,7 +947,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		eprintk("adding to request list succeeded\n");
 
-		int wait_signal = wait_event_interruptible(d->blockq, ramdiskModified(current->pid, &d->notify_pids));
+		int wait_signal = wait_event_interruptible(d->notifq, ramdiskModified(current->pid, &d->notify_pids));
 
 		osp_spin_lock(&d->mutex);
 		removeFromRequestList(current->pid, &d->notify_pids);
@@ -971,6 +975,7 @@ static void osprd_setup(osprd_info_t *d)
 {
 	/* Initialize the wait queue. */
 	init_waitqueue_head(&d->blockq);
+	init_waitqueue_head(&d->notifq);
 	osp_spin_lock_init(&d->mutex);
 	d->ticket_head = d->ticket_tail = 0;
 	d->first_ticket = NULL;
