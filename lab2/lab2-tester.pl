@@ -210,6 +210,7 @@ close FOO;
     ],
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> fd0a8b8... Added test case for notification request
 =======
     # 23
@@ -224,6 +225,8 @@ close FOO;
       "00000400" ],
 
 >>>>>>> 9f34a05... Added new test case for notification request
+=======
+>>>>>>> e38c101... Removed bad test case
     );
 
 my($ntest) = 0;
