@@ -255,6 +255,8 @@ int main(int argc, char *argv[])
                         exit(1);
                 }
 
+         if (notif) exit(0); 
+
 	}
 
 	// Delay

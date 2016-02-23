@@ -252,6 +252,11 @@ foreach $test (@tests) {
     next if $result eq $want;
     next if $want eq 'Syntax error [NULL]' && $result eq '[NULL]';
     next if $result eq $want;
+    $a = length $result;
+    $b = length $want;
+    print STDERR "a: $a\n";
+    print STDERR "b: $b\n";
+
     print STDERR "Test $ntest FAILED!\n  input was \"$in\"\n  expected output like \"$want\"\n  got \"$result\"\n";
     $ntestfailed++;
 }
