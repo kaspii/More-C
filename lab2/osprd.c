@@ -958,7 +958,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	} 
 	else
 	{
-		eprintk("Ioctl is being knotty\n");
+		eprintk("unknown command\n");
 		r = -ENOTTY; /* unknown command */
 	}
 	return r;

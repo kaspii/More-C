@@ -203,6 +203,10 @@ close FOO;
       '(./osprdaccess -r 3 && ./osprdaccess -r 3) && sleep 6 ',
       "foofoo"
     ],
+<<<<<<< HEAD
+=======
+
+>>>>>>> b13af1e... compiling code for TA
     );
 
 my($ntest) = 0;
