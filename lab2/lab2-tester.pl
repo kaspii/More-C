@@ -209,7 +209,21 @@ close FOO;
       "foobar"
     ],
 
+<<<<<<< HEAD
 >>>>>>> fd0a8b8... Added test case for notification request
+=======
+    # 23
+    [ '(./osprdaccess -n 2 1) & (sleep 2 && ' .
+      '(echo sector2 | ./osprdaccess -w -o 512) && ' .
+      '(./osprdaccess -r 1024| hexdump -C))',
+      "00000000 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |................| " .
+      "* " .
+      "00000200 73 65 63 74 6f 72 32 0a 00 00 00 00 00 00 00 00 |sector2.........| " .
+      "00000210 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |................| " .
+      "* " .
+      "00000400" ],
+
+>>>>>>> 9f34a05... Added new test case for notification request
     );
 
 my($ntest) = 0;
