@@ -191,11 +191,18 @@ close FOO;
     #21
     [
       '(./osprdaccess -n 0 32) && ' .
-      '(echo a | ./osprdaccess -w 1) && ' .
+      '(echo a | ./osprdaccess -w 3) && ' .
       '(./osprdaccess -r 16)',
       "a"
     ],
 
+    # 22
+    [ 
+      '(./osprdaccess -n 1 31) && sleep 2 && ' .
+      '(echo foo | ./osprdaccess -w 3) && sleep 3 && ' .
+      '(./osprdaccess -r 3 && ./osprdaccess -r 3) && sleep 6 ',
+      "foofoo"
+    ],
     );
 
 my($ntest) = 0;
