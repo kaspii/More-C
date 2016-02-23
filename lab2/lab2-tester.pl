@@ -198,8 +198,8 @@ close FOO;
 
     # 22
     [ 
-      '(./osprdaccess -n 1 31) && sleep 2 && ' .
-      '(echo foo | ./osprdaccess -w 3) && sleep 3 && ' .
+      '(./osprdaccess -n 1 31) & (sleep 2 && ' .
+      '(echo foo | ./osprdaccess -w 3)) && sleep 3 && ' .
       '(./osprdaccess -r 3 && ./osprdaccess -r 3) && sleep 6 ',
       "foofoo"
     ],

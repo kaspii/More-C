@@ -350,17 +350,17 @@ void notify_followers(reqList_t* l, sector_t sector, size_t num_bytes)
 	list_for_each_safe(pos, q, &l->list)
 	{
 		tmp = list_entry(pos, reqList_t, list);
-		tmp->is_modified = 1;
-		// unsigned request_end = tmp->sector_num + tmp->num_sectors;
+		// tmp->is_modified = 1;
+		unsigned request_end = tmp->sector_num + tmp->num_sectors;
 
-		// // If the actual write overlaps with the requested sectors
-		// // notify the process that the sector region they were following
-		// // has been modified by a write
-		// if ((tmp->sector_num <= sector && request_end >= sector) 
-		// 	|| (tmp->sector_num <= write_end && request_end >= write_end))
-		// {r
-		// 	tmp->is_modified = 1;
-		// }
+		// If the actual write overlaps with the requested sectors
+		// notify the process that the sector region they were following
+		// has been modified by a write
+		if ((tmp->sector_num <= sector && request_end >= sector) 
+			|| (tmp->sector_num <= write_end && request_end >= write_end))
+		{r
+			tmp->is_modified = 1;
+		}
 	}
 }
 
@@ -514,6 +514,7 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
  		memcpy((void*)data_ptr, (void*)req->buffer, num_bytes);
  		notify_followers(&d->notify_pids, req->sector, num_bytes);
  		wake_up_all(&d->notifq);
+
  	}
  	else
  	{
@@ -620,7 +621,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	eprintk("IOCTL IS ACTUALLY BEING CALLED YAY\n");
 
 	osprd_info_t *d = file2osprd(filp);	// device info
-	int r = 0;			// return value: initially 0
+	int r = 0add;			// return value: initially 0
 
 	// is file open for writing?
 	int filp_writable = (filp->f_mode & FMODE_WRITE) != 0;
