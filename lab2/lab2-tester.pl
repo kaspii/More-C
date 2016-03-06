@@ -188,7 +188,10 @@ close FOO;
       "ioctl OSPRDIOCACQUIRE: Resource deadlock avoided"
     ],
 
+    # DESIGN PROBLEM TEST CASES
+
     # 21
+    # Notification requested when any part of disk is written
     [ 
       '(./osprdaccess -n 0 32) & (sleep 2 && ' .
       '(echo foo | ./osprdaccess -w 3)) && sleep 3 && ' .
@@ -203,6 +206,8 @@ close FOO;
 =======
 
     # 22
+    # Notification requested when any part of the disk is written
+    # Testing that it works with locking as well
     [ '(./osprdaccess -n 0 32) & (sleep 2 && ' .
       '(./osprdaccess -r 6 -l 1) &' .
       '(echo foobar | ./osprdaccess -w -l)) ',
@@ -211,11 +216,19 @@ close FOO;
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> fd0a8b8... Added test case for notification request
 =======
     # 23
     [ '(./osprdaccess -n 2 1) & (sleep 2 && ' .
       '(echo sector2 | ./osprdaccess -w -o 512) && ' .
+=======
+    # 23
+<<<<<<< HEAD
+    # Notification requested on a specific sector of the disk
+    # Specifically writing to sector 2
+    [ '(./osprdaccess -n 2 1) & ((echo sector2 | ./osprdaccess -w -o 512) && ' .
+>>>>>>> c2c817a... added case 23 for design problem demo
       '(./osprdaccess -r 1024| hexdump -C))',
       "00000000 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |................| " .
       "* " .
@@ -223,10 +236,44 @@ close FOO;
       "00000210 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 |................| " .
       "* " .
       "00000400" ],
+<<<<<<< HEAD
 
 >>>>>>> 9f34a05... Added new test case for notification request
 =======
 >>>>>>> e38c101... Removed bad test case
+=======
+>>>>>>> c2c817a... added case 23 for design problem demo
+=======
+    # Notification requested 
+    # Testing with complex locking
+    [ '(./osprdaccess -n 0 32) & (echo aaa | ./osprdaccess -w 3 -l -d 0.4) & ' .
+      '(sleep 0.2 ; echo bb | ./osprdaccess -w 2 -o 1 -l -d 0.2) & ' .
+      'sleep 0.4 ; (echo c | ./osprdaccess -w 1 -o 2 -l) ; ' .
+      './osprdaccess -r 3',
+      "abc"
+    ],
+
+    # 24
+    # Notification requested
+    # Multiple writes
+    [ '(./osprdaccess -n 0 32) & (echo test1 | ./osprdaccess -w) && ' .
+      '(echo test2 | ./osprdaccess -w) && ' .
+      '(./osprdaccess -r 16 | hexdump -C)',
+      "00000000 74 65 73 74 32 0a 00 00 00 00 00 00 00 00 00 00 |test2...........| " .
+      "00000010" 
+    ],
+
+
+    # 25
+    # Notification requested
+    # Delay case
+    [ '(./osprdaccess -n 0 32) & (echo overwrite | ./osprdaccess -w -d 1) & ' .
+      '(echo hidden | ./osprdaccess -w) && ' .
+      'sleep 1.5 &&' .
+      '(./osprdaccess -r 16 | hexdump -C)',
+      "00000000 6f 76 65 72 77 72 69 74 65 0a 00 00 00 00 00 00 |overwrite.......| " .
+      "00000010" ],
+>>>>>>> 8b5d4d0... added more test cases for design problem demo
     );
 
 my($ntest) = 0;
